@@ -7,6 +7,9 @@
  *
  * Docker は要らない。配布物の tgz から直接取り出す。
  *
+ * 抽出には mind-core のレキサ／パーサをそのまま使う。独自の正規表現を持つと
+ * 解析器と辞書がずれる（実際、regex 版は `（…）` コメントを取りこぼしていた）。
+ *
  *   node tools/gen-stdlib-dict.ts
  *   node tools/gen-stdlib-dict.ts --tgz path/to/mind-for-linux-8.0.08.tgz
  *   node tools/gen-stdlib-dict.ts --dir path/to/pmind/file
@@ -21,28 +24,17 @@ import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { analyzeWord, isSeparator, splitParticle } from '../packages/mind-core/src/normalizer.ts';
+import { parse } from '../packages/mind-core/src/parser.ts';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const REPO = resolve(HERE, '..');
 const DEFAULT_TGZ = resolve(REPO, '../Mind-Docker/vendor/mind-for-linux-8.0.08.tgz');
 const OUT = resolve(REPO, 'packages/mind-core/data/stdlib.json');
 
-/** 宣言の種別。長いものから順に照合するため、この順序に意味がある。 */
-const KINDS = [
-  '等価な関数3', '等価な関数2', '等価な関数', '等価',
-  '文字列定数', '文字列実体', '文字列',
-  '小数変数', 'ワード変数', 'バイト変数', '変数',
-  '定数', '数値',
-  '仮定義', '本定義',
-  '処理単語', '関数',
-] as const;
-type Kind = (typeof KINDS)[number] | '不明';
-
 export interface WordEntry {
   name: string;
   normalized: string;
-  kind: Kind;
+  kind: string;
   /** スタック仕様コメント `（単価、個数 → ・）` の中身 */
   stack: string | null;
   /** 処理単語 / 関数に付く属性（.S .N NN など） */
@@ -122,62 +114,38 @@ function extractAttrs(rest: string): string[] {
 }
 
 function parseFile(fileName: string, text: string): WordEntry[] {
+  const result = parse(text);
   const entries: WordEntry[] = [];
-  let scope: 'global' | 'local' = 'global';
-  let suppressed = false;
 
-  const lines = text.split(/\r?\n/);
-  for (let i = 0; i < lines.length; i++) {
-    const raw = lines[i]!;
-
-    const trimmed = raw.trim();
-    if (trimmed.startsWith('コンパイル抑止終り')) { suppressed = false; continue; }
-    if (trimmed.startsWith('コンパイル抑止')) { suppressed = true; continue; }
-    if (suppressed) continue;
-
-    // 可視性の切り替えは行頭でなくても書かれる
-    if (/^[\s　]*ローカル。/.test(raw)) { scope = 'local'; continue; }
-    if (/^[\s　]*グローバル。/.test(raw)) { scope = 'global'; continue; }
-
-    // 定義は行頭から始まる。字下げされた行は定義本体。
-    if (raw.length === 0 || isSeparator(raw[0]!)) continue;
-    if (raw.startsWith('※')) continue;
-
-    const tokens = tokenize(raw);
-    const head = tokens[0];
-    if (head === undefined) continue;
-
-    const { stem, particle } = splitParticle(head);
-    if (particle !== 'とは' && particle !== 'は') continue;
-    if (stem.length === 0) continue;
-
-    // 行末の ※ コメントは属性判定から外す
-    const rest = raw.slice(raw.indexOf(head) + head.length).split('※')[0] ?? '';
-
-    // スタック仕様はコメントなので、種別・属性の判定からは外す。
-    // `（文字列 → ・）` の「文字列」を宣言の種別と読み違えないため。
-    const stack = extractStackSpec(rest);
-    const restWithoutStack = rest.replace(/[（(][^）)]*[）)]/g, ' ');
-
-    // `○○とは …。` は種別キーワードが無くても処理単語の定義。
-    // `○○は 変数。` のような宣言形とはここで区別する。
-    let kind = detectKind(restWithoutStack);
-    if (kind === '不明' && particle === 'とは') kind = '処理単語';
-
+  for (const d of result.declarations) {
     entries.push({
-      name: stem,
-      normalized: analyzeWord(stem).normalized,
-      kind,
-      stack,
-      attrs: extractAttrs(restWithoutStack),
-      scope,
+      name: d.name.raw,
+      normalized: d.name.normalized,
+      kind: d.kind,
+      stack: null,
+      attrs: [],
+      scope: d.visibility,
       file: fileName,
-      line: i + 1,
+      line: d.range.start.line + 1,
     });
   }
+
+  for (const d of result.definitions) {
+    entries.push({
+      name: d.name.raw,
+      normalized: d.name.normalized,
+      kind: d.kind,
+      stack: d.stackSpec,
+      attrs: [...d.attrs],
+      scope: d.visibility,
+      file: fileName,
+      line: d.range.start.line + 1,
+    });
+  }
+
+  entries.sort((a, b) => a.line - b.line);
   return entries;
 }
-
 
 /**
  * 仮定義 と 本定義 は同じ 1 語なのでまとめる。

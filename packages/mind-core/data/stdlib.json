@@ -8,9 +8,9 @@
     "files": 46
   },
   "counts": {
-    "total": 958,
-    "global": 692,
-    "local": 266
+    "total": 956,
+    "global": 691,
+    "local": 265
   },
   "words": [
     {
@@ -26,7 +26,7 @@
     {
       "name": "整数変数",
       "normalized": "整数変数",
-      "kind": "等価",
+      "kind": "変数",
       "stack": null,
       "attrs": [],
       "scope": "global",
@@ -36,7 +36,7 @@
     {
       "name": "文字列変数",
       "normalized": "文字列変数",
-      "kind": "等価",
+      "kind": "文字列実体",
       "stack": null,
       "attrs": [],
       "scope": "global",
@@ -46,7 +46,7 @@
     {
       "name": "文字列情報",
       "normalized": "文字列情報",
-      "kind": "等価",
+      "kind": "文字列",
       "stack": null,
       "attrs": [],
       "scope": "global",
@@ -56,7 +56,7 @@
     {
       "name": "定数",
       "normalized": "定数",
-      "kind": "等価",
+      "kind": "数値",
       "stack": null,
       "attrs": [],
       "scope": "global",
@@ -66,7 +66,7 @@
     {
       "name": "整数定数",
       "normalized": "整数定数",
-      "kind": "等価",
+      "kind": "数値",
       "stack": null,
       "attrs": [],
       "scope": "global",
@@ -106,7 +106,7 @@
     {
       "name": "ＭＩＮ",
       "normalized": "min",
-      "kind": "等価な関数",
+      "kind": "不明",
       "stack": null,
       "attrs": [],
       "scope": "global",
@@ -116,7 +116,7 @@
     {
       "name": "ＭＡＸ",
       "normalized": "max",
-      "kind": "等価な関数",
+      "kind": "不明",
       "stack": null,
       "attrs": [],
       "scope": "global",
@@ -552,16 +552,6 @@
       "scope": "global",
       "file": "asmequ.src",
       "line": 134
-    },
-    {
-      "name": "（文字列バイト数補正",
-      "normalized": "(文字列バイト数補正",
-      "kind": "等価",
-      "stack": null,
-      "attrs": [],
-      "scope": "global",
-      "file": "asmequ.src",
-      "line": 136
     },
     {
       "name": "小数変数",
@@ -1691,7 +1681,7 @@
     {
       "name": "数値を追加合成",
       "normalized": "数値追加合成",
-      "kind": "文字列",
+      "kind": "処理単語",
       "stack": null,
       "attrs": [],
       "scope": "global",
@@ -2059,7 +2049,7 @@
     {
       "name": "全桁変換文字列長さ",
       "normalized": "全桁変換文字列長",
-      "kind": "文字列",
+      "kind": "数値",
       "stack": null,
       "attrs": [],
       "scope": "global",
@@ -2254,7 +2244,7 @@
       "name": "小数表記が有れば数値変換",
       "normalized": "小数表記有数値変換",
       "kind": "処理単語",
-      "stack": "文字列 → 実数、真偽、真(=実数",
+      "stack": null,
       "attrs": [
         ".S",
         "WO"
@@ -2812,7 +2802,7 @@
       "name": "タイムスタンプを表示",
       "normalized": "タイムスタンプ表示",
       "kind": "処理単語",
-      "stack": null,
+      "stack": "日時(32) → ・",
       "attrs": [
         ".N"
       ],
@@ -2971,7 +2961,9 @@
       "normalized": "このメッセージスタック検査",
       "kind": "処理単語",
       "stack": "文字列 → ・",
-      "attrs": [],
+      "attrs": [
+        ".S"
+      ],
       "scope": "global",
       "file": "ckaridef.src",
       "line": 117,
@@ -3050,7 +3042,9 @@
       "normalized": "文字列入力",
       "kind": "処理単語",
       "stack": "［実体情報をつかい］ → 文字列",
-      "attrs": [],
+      "attrs": [
+        ".Y"
+      ],
       "scope": "global",
       "file": "fread_source_andr.src",
       "line": 1564,
@@ -3591,8 +3585,8 @@
     {
       "name": "起動引数の一つを参照０",
       "normalized": "起動引数一参照0",
-      "kind": "文字列",
-      "stack": null,
+      "kind": "処理単語",
+      "stack": "位置(0は自身パス) → 文字列",
       "attrs": [],
       "scope": "local",
       "file": "cmain.src",
@@ -3601,18 +3595,8 @@
     {
       "name": "起動引数の一つを参照",
       "normalized": "起動引数一参照",
-      "kind": "文字列",
-      "stack": null,
-      "attrs": [],
-      "scope": "local",
-      "file": "cmain.src",
-      "line": 872
-    },
-    {
-      "name": "起動引数の一つを参照",
-      "normalized": "起動引数一参照",
       "kind": "処理単語",
-      "stack": null,
+      "stack": "位置(0は自身パス) → 文字列",
       "attrs": [],
       "scope": "local",
       "file": "cmain.src",
@@ -3622,8 +3606,8 @@
     {
       "name": "起動引数",
       "normalized": "起動引数",
-      "kind": "文字列",
-      "stack": null,
+      "kind": "関数",
+      "stack": "位置(0は自身パス) → 文字列",
       "attrs": [],
       "scope": "global",
       "file": "cmain.src",
@@ -3803,7 +3787,7 @@
       "name": "文字列プールを獲得",
       "normalized": "文字列プール獲得",
       "kind": "等価",
-      "stack": "容量 → プール情報",
+      "stack": null,
       "attrs": [],
       "scope": "global",
       "file": "cmain.src",
@@ -3813,7 +3797,7 @@
       "name": "文字列プールを解放",
       "normalized": "文字列プール解放",
       "kind": "等価",
-      "stack": "プール情報 → ・",
+      "stack": null,
       "attrs": [],
       "scope": "global",
       "file": "cmain.src",
@@ -3842,8 +3826,8 @@
     {
       "name": "マージン指定で文字列実体を獲得して複写",
       "normalized": "マージン指定文字列実体獲得複写",
-      "kind": "文字列実体",
-      "stack": null,
+      "kind": "処理単語",
+      "stack": "文字列、マージン(％) → 文字列実体情報",
       "attrs": [],
       "scope": "global",
       "file": "cmain.src",
@@ -3925,7 +3909,7 @@
       "name": "日時を値で得る",
       "normalized": "日時値得",
       "kind": "処理単語",
-      "stack": "・ → 日時(32",
+      "stack": null,
       "attrs": [],
       "scope": "global",
       "file": "cmain.src",
@@ -3935,7 +3919,7 @@
       "name": "日時とミリ秒を値で得る",
       "normalized": "日時ミリ秒値得",
       "kind": "処理単語",
-      "stack": "・ → 日時(32",
+      "stack": "・ → 日時(32)、ミリ秒",
       "attrs": [],
       "scope": "global",
       "file": "cmain.src",
@@ -3993,7 +3977,7 @@
       "name": "日時を正規化",
       "normalized": "日時正規化",
       "kind": "処理単語",
-      "stack": "構造体情報 → 日時(32",
+      "stack": null,
       "attrs": [
         ".Z"
       ],
@@ -4004,7 +3988,7 @@
     {
       "name": "正規化日時を英語に変換",
       "normalized": "正規化日時英語変換",
-      "kind": "文字列",
+      "kind": "処理単語",
       "stack": null,
       "attrs": [],
       "scope": "global",
@@ -4692,7 +4676,7 @@
     {
       "name": "半角空白文字列",
       "normalized": "半角空白文字列",
-      "kind": "文字列実体",
+      "kind": "処理単語",
       "stack": null,
       "attrs": [],
       "scope": "local",
@@ -5474,7 +5458,7 @@
       "name": "この番号のエラーメッセージ",
       "normalized": "この番号エラーメッセージ",
       "kind": "不明",
-      "stack": null,
+      "stack": "番号(errno) → メッセージ",
       "attrs": [],
       "scope": "global",
       "file": "ferror.src",
@@ -5484,7 +5468,7 @@
       "name": "この番号でエラー登録",
       "normalized": "この番号エラー登録",
       "kind": "処理単語",
-      "stack": null,
+      "stack": "番号(errno) → ・",
       "attrs": [],
       "scope": "global",
       "file": "ferror.src",
@@ -5613,7 +5597,7 @@
     {
       "name": "□Ａｒｇプール",
       "normalized": "□argプール",
-      "kind": "文字列実体",
+      "kind": "不明",
       "stack": null,
       "attrs": [],
       "scope": "local",
@@ -5683,7 +5667,7 @@
     {
       "name": "オプション",
       "normalized": "オプション",
-      "kind": "文字列",
+      "kind": "不明",
       "stack": null,
       "attrs": [],
       "scope": "local",
@@ -5856,7 +5840,7 @@
       "name": "子プロセスに振り替え",
       "normalized": "子プロセス振替",
       "kind": "処理単語",
-      "stack": "起動文字列 → ×（戻って来ない",
+      "stack": null,
       "attrs": [],
       "scope": "global",
       "file": "fexecunix.src",
@@ -6712,7 +6696,7 @@
     {
       "name": "読み出し文字列長さ×２",
       "normalized": "読出文字列長×2",
-      "kind": "文字列",
+      "kind": "数値",
       "stack": null,
       "attrs": [],
       "scope": "global",
@@ -6722,7 +6706,7 @@
     {
       "name": "読み出し文字列長さ×４",
       "normalized": "読出文字列長×4",
-      "kind": "文字列",
+      "kind": "数値",
       "stack": null,
       "attrs": [],
       "scope": "global",
@@ -7032,7 +7016,7 @@
     {
       "name": "トライパス",
       "normalized": "トライパス",
-      "kind": "文字列定数",
+      "kind": "不明",
       "stack": null,
       "attrs": [],
       "scope": "local",
@@ -8341,7 +8325,7 @@
       "name": "バッファから有効文字を一バイト取り出し",
       "normalized": "バッファ有効文字一バイト取出",
       "kind": "処理単語",
-      "stack": "管理テーブル → 文字(8",
+      "stack": null,
       "attrs": [],
       "scope": "local",
       "file": "fread.src",
@@ -8351,7 +8335,7 @@
       "name": "バッファから有効文字を一文字取り出し",
       "normalized": "バッファ有効文字一文字取出",
       "kind": "処理単語",
-      "stack": "管理テーブル → 文字(16",
+      "stack": null,
       "attrs": [],
       "scope": "local",
       "file": "fread.src",
@@ -8860,7 +8844,7 @@
       "name": "バッファから有効文字を一バイト取り出し",
       "normalized": "バッファ有効文字一バイト取出",
       "kind": "処理単語",
-      "stack": "管理テーブル → 文字(8",
+      "stack": null,
       "attrs": [],
       "scope": "local",
       "file": "fread_source_andr.src",
@@ -8870,7 +8854,7 @@
       "name": "バッファから有効文字を一文字取り出し",
       "normalized": "バッファ有効文字一文字取出",
       "kind": "処理単語",
-      "stack": "管理テーブル → 文字(16",
+      "stack": null,
       "attrs": [],
       "scope": "local",
       "file": "fread_source_andr.src",
@@ -9401,7 +9385,7 @@
       "name": "ファイルまたはディレクトリ有り検査",
       "normalized": "ファイルディレクトリ有検査",
       "kind": "処理単語",
-      "stack": "ディレクトリ名 → ０、１(file",
+      "stack": "ディレクトリ名 → ０、１(file)，２(dir)",
       "attrs": [
         ".S"
       ],
@@ -9425,7 +9409,7 @@
       "name": "モジュールをロード",
       "normalized": "モジュールロード",
       "kind": "処理単語",
-      "stack": "モジュール名 → モジュールハンドル(0はエラー",
+      "stack": null,
       "attrs": [],
       "scope": "global",
       "file": "funixapi.src",

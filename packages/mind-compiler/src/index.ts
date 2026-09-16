@@ -1,8 +1,8 @@
-export { NullCompiler } from './adapter.js';
+export { NullCompiler } from './adapter.ts';
 export type {
   CompileDiagnostic,
   CompileInput,
   CompileResult,
   DiagnosticSeverity,
   MindCompiler,
-} from './adapter.js';
+} from './adapter.ts';
