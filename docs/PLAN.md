@@ -4,7 +4,7 @@
 　　　言語仕様は Version 9 を基準。検証環境は Linux 版が最新の **Version 8**（後述 2.5）
 成果物: VS Code 向け拡張 + LSP 準拠 Language Server
 実装スタック: **TypeScript 一本**（`vscode-languageserver-node`）
-最終更新: 2026-09-16（Mind-Docker への分離、M0 完了、標準単語辞書の生成を反映）
+最終更新: 2026-09-16（Mind-Docker への分離、M0 / M1 完了、標準単語辞書の生成を反映）
 
 > **更新履歴**
 > - 2026-09-14 初版
@@ -12,6 +12,7 @@
 > - 2026-09-16 処理系の Docker 環境を [Mind-Docker](https://github.com/shin3tky/Mind-Docker) に分離。
 >   npm workspaces のスケルトンを作成。**M0（正規化エンジン）完了**、
 >   **標準単語辞書 `stdlib.json` を生成**（file ライブラリ 692 語 global / 266 語 local）。
+> - 2026-09-16 **M1（拡張スケルトン + ハイライト）完了**。tmLanguage をトークン化テストで固定（104 件 green）。
 >   「確認したい事項」のうち 2 件が解決し、M0 の差分テストと M4 の辞書自動生成が実行可能になった
 
 ---
@@ -329,10 +330,18 @@ MindLS/
 │  ├─ mind-language-server/
 │  │  └─ ⬜ src/{server,handlers/,diagnostics/}.ts
 │  └─ vscode-mind/
-│     └─ ⬜ src/extension.ts, syntaxes/mind.tmLanguage.json, ...
-├─ ✅ tools/gen-stdlib-dict.ts    # 配布物から標準単語辞書を生成（Docker 不要）
+│     ├─ ✅ package.json           # contributes.languages / grammars / configuration / commands
+│     ├─ ✅ language-configuration.json
+│     ├─ ✅ syntaxes/mind.tmLanguage.json
+│     ├─ ✅ src/extension.ts       # 文字コードと関連付けを設定するコマンド
+│     └─ ✅ test/                  # vscode-textmate でのトークン化テスト
+├─ tools/
+│  ├─ ✅ gen-stdlib-dict.ts       # 配布物から標準単語辞書を生成（Docker 不要）
+│  ├─ ✅ extract-samples.ts       # 公式サンプルを UTF-8 で展開（Git 管理外）
 │  └─ ⬜ diff-normalizer.ts       # 実コンパイラとの差分テストドライバ
-├─ ✅ fixtures/hello.src
+├─ fixtures/
+│  ├─ ✅ hello.src  syntax.src    # 文法テスト用（コミットする）
+│  └─ ⬜ mind-samples/            # 公式サンプルの展開先（Git 管理外）
 └─ docs/
    ├─ ✅ PLAN.md                  # 本書
    └─ ✅ COMPILER-BACKEND.md      # 実 Mind コンパイラとの結合（DOCKER.md を置き換え）
@@ -366,21 +375,39 @@ MindLS には取り込まない。二重メンテを避けるため、結合点�
   （QEMU で遅いので CI / 夜間バッチ向き。単体テストのループには入れない）
 - 完了条件: 全ゴールデンテストがグリーン + 差分テストで既知の不一致がゼロ
 
-### M1 — 拡張スケルトン + ハイライト（2〜3 日）
+### M1 — 拡張スケルトン + ハイライト — **完了** ✅
 
-- `yo code` 相当で拡張を作成、`.src` を言語 `mind` に登録
-  （`.src` は他言語とも衝突しうるので、先頭行のパターンや設定で除外できるようにする）
+`packages/vscode-mind/` として実装。
+
+- `.src` / `.mnd` を言語 `mind` に登録。`.src` は他言語とも衝突するため、
+  コマンド **`Mind: このワークスペースの文字コードと関連付けを設定する`** で
+  ワークスペースに `files.associations` と `[mind].files.encoding` を書き込めるようにした
 - `language-configuration.json`
-  - コメント: 行 `※`、ブロック `（ ）`
-  - 括弧ペア: `「」` `『』` `（）` `()` `""`
-  - `とは` の後に自動インデント、`。` でデデント
-- `mind.tmLanguage.json`
-  - キーワード（4.2 の一覧）/ 宣言語 / リテラル / コメント / 定義行の単語名
-  - **先行事例の教訓**: tmLanguage は 1 つでも正規表現が壊れると着色が全滅する。
-    パターンを 1 つずつ足して都度確認する
-  - 助詞は後読み `(?<=\w)(は|とは|を|から|と|に|へ|で|が|の)\b` 相当で別スコープに
-- 文字コードの案内（`.vscode/settings.json` テンプレート生成コマンド）
-- 完了条件: 公式 `sample/` のコードが妥当に着色される
+  - コメント: 行 `※`、ブロック `（ ␣ … ␣ ）`（**両端の空白込みで登録**。空白が無いと配列添字になるため）
+  - 括弧ペア: `「」` `『』` `（）` `()`
+  - `wordPattern` を分かち書きに合わせた（既定の単語判定では日本語の単語が切れる）
+  - `とは` / `は` / `ならば` / `ここから` の後で字下げ、`。` で戻す
+- `syntaxes/mind.tmLanguage.json`
+  - コメント・文字列・文字定数・数値・制御構文・宣言語・定義行の単語名・助詞
+  - 制御構文は**送り仮名の表記ゆれを列挙**している。取りこぼしより取りすぎのほうが害が大きいため、
+    厳密な区別は M6 の Semantic Tokens に回す
+
+**検証は目視ではなくトークン化テストでおこなう。** VS Code と同じエンジン
+（`vscode-textmate` + `vscode-oniguruma`）でフィクスチャをトークン化し、スコープを固定した。
+
+| テスト | 内容 |
+|---|---|
+| `grammar.test.ts`（55 件） | コメント・リテラル・定義・宣言・制御構文・助詞のスコープを 1 つずつ固定 |
+| `grammar-samples.test.ts`（15 件） | 公式サンプル全 15 本。暴走トークン無し・文字列/コメントが飲み込んでいない・定義が取れている |
+
+とくに効いた検証:
+
+- `（ここから初期化）` は**コメント**、`配列（１）` は**配列添字**。両端の空白で判定できている
+- `一行表示すること。` の `と` を助詞と誤判定しない（直前がひらがなの場合は送り仮名とみなす）
+- `表示用エンコード０` の `０` を数値として着色しない
+
+公式サンプルは再配布しないため Git には入れていない。
+`node tools/extract-samples.ts` で展開したときだけサンプルのテストが走る。
 
 ### M2 — レキサ / パーサ / シンボルテーブル（3〜5 日）
 
@@ -556,6 +583,8 @@ UTF-8 へ変換して取り込む。**Mind 本体は再配布しない**（`vend
 | マイルストーン | 目安 |
 |---------------|------|
 | ~~M-1 Docker 環境~~ | **完了** ✅ |
+| ~~M0 正規化~~ | **完了** ✅ |
+| ~~M1 ハイライト~~ | **完了** ✅ |
 | M0 正規化 PoC | 1〜2 日（+ 差分テストドライバ 1 日） |
 | M1 ハイライト | 2〜3 日 |
 | M2 パーサ/シンボル | 3〜5 日 |

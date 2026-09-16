@@ -1,0 +1,141 @@
+{
+  "$schema": "https://raw.githubusercontent.com/martinring/tmlanguage/master/tmlanguage.json",
+  "name": "Mind",
+  "scopeName": "source.mind",
+  "patterns": [
+    {
+      "include": "#suppressed"
+    },
+    {
+      "include": "#string-japanese"
+    },
+    {
+      "include": "#string-double"
+    },
+    {
+      "include": "#character"
+    },
+    {
+      "include": "#comment-line"
+    },
+    {
+      "include": "#comment-block"
+    },
+    {
+      "include": "#definition"
+    },
+    {
+      "include": "#declaration"
+    },
+    {
+      "include": "#control"
+    },
+    {
+      "include": "#storage"
+    },
+    {
+      "include": "#number"
+    },
+    {
+      "include": "#terminator"
+    },
+    {
+      "include": "#particle"
+    }
+  ],
+  "repository": {
+    "suppressed": {
+      "comment": "コンパイル抑止。〜コンパイル抑止終り。 はブロックコメント相当",
+      "name": "comment.block.suppressed.mind",
+      "begin": "コンパイル抑止。",
+      "end": "コンパイル抑止終り。"
+    },
+    "comment-line": {
+      "comment": "※ から行末まで",
+      "name": "comment.line.reference-mark.mind",
+      "begin": "※",
+      "end": "$"
+    },
+    "comment-block": {
+      "comment": "（ … ） は両端に空白があるときだけコメント。空白が無ければ配列添字・演算の括弧",
+      "name": "comment.block.mind",
+      "begin": "(?:^|(?<=[\\s\\u3000]))（",
+      "end": "）(?=[\\s\\u3000]|$)"
+    },
+    "string-japanese": {
+      "name": "string.quoted.japanese.mind",
+      "begin": "「",
+      "end": "」",
+      "patterns": [
+        {
+          "include": "#string-escape"
+        }
+      ]
+    },
+    "string-double": {
+      "name": "string.quoted.double.mind",
+      "begin": "\"",
+      "end": "\"",
+      "patterns": [
+        {
+          "include": "#string-escape"
+        }
+      ]
+    },
+    "string-escape": {
+      "comment": "文字列中の制御コード指定 ＆改行＆ ＆ＴＡＢ＆ ＆0D0A＆ など",
+      "name": "constant.character.escape.mind",
+      "match": "[＆&][^＆&\\n]{1,8}[＆&]"
+    },
+    "character": {
+      "comment": "文字定数 'A' '漢' （半角・全角のシングルクォート）",
+      "name": "constant.character.mind",
+      "match": "(['’])([^'’\\n])\\1"
+    },
+    "number": {
+      "comment": "数値。行頭または区切りの直後から始まるものだけを数値とみなす（識別子中の数字を拾わないため）",
+      "match": "(^|[\\s\\u3000,、，（）()])((?:0[xX][0-9a-fA-F]+|[0-9a-fA-F]+[hH]|[0-9]+[xX][0-9a-fA-F]+|[-−－]?[0-9０-９]+(?:[.．][0-9０-９]+)?(?:[eE][-+]?[0-9]+)?))",
+      "captures": {
+        "2": {
+          "name": "constant.numeric.mind"
+        }
+      }
+    },
+    "definition": {
+      "comment": "行頭から始まる定義。`○○とは` / `○○は` の単語名を拾う",
+      "match": "^([^\\s\\u3000,、，※。]+?)(とは|は)(?=[\\s\\u3000]|$)",
+      "captures": {
+        "1": {
+          "name": "entity.name.function.mind"
+        },
+        "2": {
+          "name": "keyword.other.particle.definition.mind"
+        }
+      }
+    },
+    "declaration": {
+      "comment": "宣言に使われる語",
+      "name": "storage.type.mind",
+      "match": "(?<=[\\s\\u3000])(仮定義|本定義|処理単語|関数|等価な関数[23]?|等価|小数変数|ワード変数|バイト変数|変数|文字列実体|文字列定数|文字列|定数|数値)(?=[\\s\\u3000。]|$)"
+    },
+    "storage": {
+      "comment": "行頭の可視性切り替え",
+      "name": "storage.modifier.mind",
+      "match": "(?<=^|[\\s\\u3000])(ローカル|グローバル)(?=。)"
+    },
+    "control": {
+      "comment": "制御構文。Mind は送り仮名を無視するので表記ゆれがあるが、取りこぼしより取りすぎのほうが害が大きいため、よく使われる表記だけを列挙する。厳密な区別は M6 の Semantic Tokens でおこなう。",
+      "name": "keyword.control.mind",
+      "match": "(?<=^|[\\s\\u3000])(さもなければ|でなければ|ならば|もし|つぎに|ここから|繰り返す|繰り返し|打ち切り|打ち切る|もう一度|回数指定し|回数指定|回数|実行終り|事例終り|選択終り|終り|選択する|選択し|文字列事例をとる|範囲事例をとる|事例をとる|例外なら|範囲外なら|無処理|または|かつ)(?=[\\s\\u3000。、，,]|$)"
+    },
+    "terminator": {
+      "name": "punctuation.terminator.mind",
+      "match": "。"
+    },
+    "particle": {
+      "comment": "助詞。構文判定の手がかりなので別スコープにする。直前がひらがなの場合は送り仮名の可能性が高い（`すること。` の `と` など）ので対象外にする。取りこぼすより取りすぎないことを優先する。",
+      "name": "keyword.other.particle.mind",
+      "match": "(?<=[^\\s\\u3000\\u3041-\\u3096])(とは|から|まで|より|は|が|を|に|へ|と|で|の)(?=[\\s\\u3000。、，,]|$)"
+    }
+  }
+}

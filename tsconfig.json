@@ -1,8 +1,17 @@
 {
   "files": [],
   "references": [
-    { "path": "./packages/mind-core" },
-    { "path": "./packages/mind-compiler" },
-    { "path": "./packages/mind-language-server" }
+    {
+      "path": "./packages/mind-core"
+    },
+    {
+      "path": "./packages/mind-compiler"
+    },
+    {
+      "path": "./packages/mind-language-server"
+    },
+    {
+      "path": "./packages/vscode-mind"
+    }
   ]
 }

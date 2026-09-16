@@ -20,3 +20,6 @@ vendor/*.tgz
 *.vsix
 
 .DS_Store
+
+# 公式サンプルの展開先（再配布しない。tools/extract-samples.ts で作る）
+fixtures/mind-samples/

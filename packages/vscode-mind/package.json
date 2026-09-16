@@ -1,0 +1,56 @@
+{
+  "name": "vscode-mind",
+  "displayName": "Mind (日本語プログラミング言語)",
+  "description": "日本語プログラミング言語 Mind の構文ハイライトと Language Server",
+  "version": "0.0.1",
+  "private": true,
+  "license": "Apache-2.0",
+  "engines": { "vscode": "^1.90.0" },
+  "categories": ["Programming Languages"],
+  "main": "./dist/extension.js",
+  "scripts": { "build": "tsc --build" },
+  "contributes": {
+    "languages": [
+      {
+        "id": "mind",
+        "aliases": ["Mind", "mind"],
+        "extensions": [".src", ".mnd"],
+        "configuration": "./language-configuration.json"
+      }
+    ],
+    "grammars": [
+      {
+        "language": "mind",
+        "scopeName": "source.mind",
+        "path": "./syntaxes/mind.tmLanguage.json"
+      }
+    ],
+    "commands": [
+      {
+        "command": "mind.configureWorkspace",
+        "title": "Mind: このワークスペースの文字コードと関連付けを設定する",
+        "category": "Mind"
+      }
+    ],
+    "configuration": {
+      "title": "Mind",
+      "properties": {
+        "mind.library": {
+          "type": "string",
+          "default": "file",
+          "description": "リンクする標準ライブラリ。GUI 編なら guilib。"
+        },
+        "mind.compiler.docker.image": {
+          "type": "string",
+          "default": "mind-docker:8.0.08",
+          "description": "実コンパイラ連携に使う Docker イメージ。空にすると連携を無効にする。"
+        },
+        "mind.compiler.enabled": {
+          "type": "boolean",
+          "default": false,
+          "description": "保存時に実 Mind コンパイラで文法チェックする（Docker が必要）。既定は無効で、自前解析だけで動く。"
+        }
+      }
+    }
+  }
+}
