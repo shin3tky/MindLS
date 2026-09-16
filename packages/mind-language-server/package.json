@@ -1,0 +1,12 @@
+{
+  "name": "@mindls/language-server",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Mind の Language Server（LSP / stdio）",
+  "bin": { "mind-language-server": "./dist/cli.js" },
+  "main": "./dist/server.js",
+  "types": "./dist/server.d.ts",
+  "files": ["dist"],
+  "scripts": { "build": "tsc --build" }
+}

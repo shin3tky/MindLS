@@ -1,0 +1,22 @@
+{
+  "name": "mindls",
+  "private": true,
+  "type": "module",
+  "description": "日本語プログラミング言語 Mind の Language Server と VS Code 拡張",
+  "license": "Apache-2.0",
+  "engines": { "node": ">=22" },
+  "workspaces": ["packages/*"],
+  "scripts": {
+    "build": "tsc --build",
+    "clean": "tsc --build --clean",
+    "typecheck": "tsc --build --force",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "gen:stdlib": "node tools/gen-stdlib-dict.ts"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.0",
+    "typescript": "^5.7.0",
+    "vitest": "^5.0.0"
+  }
+}

@@ -4,11 +4,14 @@
 　　　言語仕様は Version 9 を基準。検証環境は Linux 版が最新の **Version 8**（後述 2.5）
 成果物: VS Code 向け拡張 + LSP 準拠 Language Server
 実装スタック: **TypeScript 一本**（`vscode-languageserver-node`）
-最終更新: 2026-09-14（Docker 検証環境の構築結果を反映）
+最終更新: 2026-09-16（Mind-Docker への分離、M0 完了、標準単語辞書の生成を反映）
 
 > **更新履歴**
 > - 2026-09-14 初版
-> - 2026-09-14 Docker 検証環境（`docs/DOCKER.md`）の構築完了を反映。
+> - 2026-09-14 Docker 検証環境の構築完了を反映。
+> - 2026-09-16 処理系の Docker 環境を [Mind-Docker](https://github.com/shin3tky/Mind-Docker) に分離。
+>   npm workspaces のスケルトンを作成。**M0（正規化エンジン）完了**、
+>   **標準単語辞書 `stdlib.json` を生成**（file ライブラリ 692 語 global / 266 語 local）。
 >   「確認したい事項」のうち 2 件が解決し、M0 の差分テストと M4 の辞書自動生成が実行可能になった
 
 ---
@@ -111,7 +114,7 @@ TAB / 空白（半角・全角）/ カンマ（半角 , 全角 ，）/ 読点（
 | GUI 編（`guilib`） | あり | なし |
 
 **Mind 9 に Linux 版は存在しない。** よって手元（macOS / Apple Silicon）で動かせる実処理系は
-**Mind 8 for Linux** であり、Docker の platform は `linux/amd64` ではなく **`linux/386`** になる。
+**Mind 8 for Linux** であり、Docker の platform は `linux/amd64` ではなく **`linux/amd64`** になる。
 Apple Silicon の Rosetta は 32bit x86 を扱えないため QEMU エミュレーションとなる（→ 遅い。M5 の設計に影響）。
 
 送り仮名の削除・正規化・分かち書き・制御構文といった**言語のコアは 8 と 9 でほぼ共通**なので、
@@ -146,31 +149,31 @@ Mind のコンパイルは下位ライブラリ（`lib/file`, `lib/guilib` な�
 - 1 プログラムが複数ソースに分かれる（副ソースの読み出し）ケースがあるため、
   **マルチファイルのシンボル解決**を最初から設計に入れる
 
-### 2.7 実処理系の検証環境 — **構築済み** ✅
+### 2.7 実処理系の検証環境 — **別リポジトリに分離済み** ✅
 
-`Dockerfile` / `docker-compose.yml` / `Makefile` / `docker/bin/*` として整備済み。
-詳細は **`docs/DOCKER.md`**。
+処理系の Docker 環境は [Mind-Docker](https://github.com/shin3tky/Mind-Docker) が持つ。
+MindLS はそのイメージと CLI 契約だけに依存する。詳細は **`docs/COMPILER-BACKEND.md`**。
 
 ```sh
-make build     # linux/386 の runtime イメージをビルド
-make hello     # fixtures/hello.src をコンパイルして実行（疎通確認済み）
-make inspect   # 配布物の中身を調べる
+cd ../Mind-Docker && make build && make selftest   # mind-docker:8.0.08 ができる
 ```
 
-`fixtures/hello.src`（UTF-8）→ `.mindbuild/hello.src`（EUC-JP）→ 本物の `mind` →
-`hello`（ELF 32-bit / Intel 80386）+ `hello.mco` + `hello.sym` + `hello.his` まで**通ることを確認済み**。
+UTF-8 のソース → EUC-JP → 本物の `mind` → 実行ファイル + `.mco` + `.sym` + `.his` まで、
+Windows 11 + WSL2 / macOS (Apple Silicon) / x86_64 Linux で**通ることを確認済み**。
 
 これにより次が可能になった。
 
-| できるようになったこと | どこで使うか |
-|---|---|
-| 正規化規則・分かち書き・構文の**答え合わせ** | M0 の差分テスト |
-| `.inf` の実物を得てフォーマットを確定 | M5 のパーサ実装 |
-| 標準ライブラリ `.src` からの**辞書自動生成** | M4（後述、A 案が成立） |
+| できるようになったこと | どこで使うか | Docker |
+|---|---|---|
+| 標準ライブラリ `.src` からの**辞書自動生成** | M4（**完了**。配布物から直接読む） | **不要** |
+| 正規化規則・分かち書き・構文の**答え合わせ** | M0 の差分テスト | 必要（任意実行） |
+| `.inf` の実物を得てフォーマットを確定 | M5 のパーサ実装 | 必要（オプトイン） |
 
-**制約**: QEMU エミュレーションのためコンパイル 1 回あたり数秒。
-**Language Server 本体はホスト側ネイティブの Node で動かし、このコンテナは「保存時に叩くバックエンド」**
-として使う。対話的な補完・ホバーのために毎打鍵で叩くことはできない。
+**制約**: Apple Silicon ではエミュレーションになるぶん遅い。
+**Language Server 本体はホスト側ネイティブの Node で動かし、コンテナは「保存時に叩くバックエンド」**
+として使う。打鍵ごとの補完・ホバーは自前解析だけで完結させる。
+
+**拡張の利用者に Docker を要求しない。** Docker から取り出したものは生成物としてコミットする。
 
 ---
 
@@ -308,41 +311,35 @@ interface MindToken {
 
 ## 5. リポジトリ構成
 
-`✅` は構築済み、`⬜` はこれから。
+`✅` は実装済み、`⬜` はこれから。
 
 ```
 MindLS/
-├─ ✅ Dockerfile                  # linux/386 マルチステージ（base/builder/runtime/dev）
-├─ ✅ docker-compose.yml
-├─ ✅ Makefile                    # check / build / hello / inspect / shell / clean
-├─ ✅ .dockerignore  .gitignore
-├─ ✅ docker/bin/
-│     ├─ mindc                    # UTF-8 ソース → EUC-JP 変換してコンパイルするラッパー
-│     ├─ mindrun                  # 実行ファイルを入出力 UTF-8 で実行
-│     ├─ mind-inspect             # 配布物の中身を調べる
-│     └─ mind-entrypoint
-├─ ✅ vendor/                     # Mind 配布物（.tgz は Git 管理外）
-├─ ✅ fixtures/hello.src          # 疎通確認用
-├─ ⬜ package.json                # npm workspaces
-├─ ⬜ tsconfig.base.json
-├─ ⬜ packages/
-│     ├─ mind-core/
-│     │   ├─ src/{normalizer,lexer,parser,symbols,stdlib}.ts
-│     │   └─ test/                # Vitest
-│     ├─ mind-language-server/
-│     │   └─ src/{server,handlers/,diagnostics/}.ts
-│     └─ vscode-mind/
-│         ├─ src/extension.ts
-│         ├─ syntaxes/mind.tmLanguage.json
-│         ├─ language-configuration.json
-│         └─ package.json         # contributes.languages / grammars / configuration
-├─ ⬜ tools/
-│     ├─ build-stdlib-dict.ts     # 標準単語辞書の生成（pmind/file/*.src から）
-│     └─ diff-normalizer.ts       # 実コンパイラとの差分テストドライバ
+├─ ✅ package.json                # npm workspaces（Node 22 / ESM）
+├─ ✅ tsconfig.base.json  tsconfig.json  vitest.config.ts
+├─ ✅ .gitattributes              # 改行は LF 固定（Windows 対策）
+├─ packages/
+│  ├─ mind-core/                  # エディタ非依存のコア
+│  │  ├─ ✅ src/normalizer.ts     # 正規化・助詞の切り出し・否定形の検出
+│  │  ├─ ⬜ src/{lexer,parser,symbols}.ts
+│  │  ├─ ✅ data/stdlib.json      # 標準単語辞書（生成物だがコミットする）
+│  │  └─ ✅ test/                 # Vitest ゴールデンテスト
+│  ├─ mind-compiler/              # 実処理系アダプタ
+│  │  └─ ⬜ src/{adapter,docker,local,inf-parser,offset-map}.ts
+│  ├─ mind-language-server/
+│  │  └─ ⬜ src/{server,handlers/,diagnostics/}.ts
+│  └─ vscode-mind/
+│     └─ ⬜ src/extension.ts, syntaxes/mind.tmLanguage.json, ...
+├─ ✅ tools/gen-stdlib-dict.ts    # 配布物から標準単語辞書を生成（Docker 不要）
+│  └─ ⬜ diff-normalizer.ts       # 実コンパイラとの差分テストドライバ
+├─ ✅ fixtures/hello.src
 └─ docs/
-   ├─ ✅ DOCKER.md                # Mind 処理系の Docker 環境
-   └─ ✅ PLAN.md                  # 本書
+   ├─ ✅ PLAN.md                  # 本書
+   └─ ✅ COMPILER-BACKEND.md      # 実 Mind コンパイラとの結合（DOCKER.md を置き換え）
 ```
+
+処理系の Docker 環境は **[Mind-Docker](https://github.com/shin3tky/Mind-Docker)（別リポジトリ）**。
+MindLS には取り込まない。二重メンテを避けるため、結合点はイメージ名と CLI 契約の 1 点だけにする。
 
 ---
 
@@ -350,7 +347,8 @@ MindLS/
 
 ### M-1 — Mind 処理系の Docker 環境 — **完了** ✅
 
-`docs/DOCKER.md` 参照。`make hello` でコンパイル〜実行まで疎通確認済み。
+別リポジトリ [Mind-Docker](https://github.com/shin3tky/Mind-Docker) として分離。
+3 プラットフォームで `make selftest` 通過。詳細は `docs/COMPILER-BACKEND.md`。
 
 ### M0 — 正規化エンジンの PoC（1〜2 日）
 
@@ -425,9 +423,9 @@ MindLS/
     | `pmind/socketlib/` | 2 (+sample 7) | ソケットライブラリ |
     | `pmind/sample/` `sampleF/` | 6 / 9 | サンプル（`fixtures/` 取り込み候補） |
 
-  - `tools/build-stdlib-dict.ts` が `pmind/file/*.src` の定義行とスタック仕様コメントを
+  - `tools/gen-stdlib-dict.ts` が `pmind/file/*.src` の定義行とスタック仕様コメントを
     パースして `stdlib.json` を生成する。**当初の「B（保険）案」は不要になった**
-  - 取り出し方: `docker compose run --rm mind bash -c 'cp -r /opt/mind/pmind/file /work/vendor/stdlib-src'`
+  - 取り出し方: `npm run gen:stdlib   # 配布物の tgz から直接読む。Docker は不要`
   - 規模感: 標準ライブラリ `file` で約 800 単語（`mhist` の total words より）
   - **注意**: これは Mind **8** の辞書。Mind 9 で追加された単語と GUI 編（`guilib`）は含まれない。
     Windows 環境が用意できた時点で差分を取り込む
@@ -455,11 +453,12 @@ MindLS/
 #### 6.2 実コンパイラ連携（オプトイン・保存時）— **バックエンドは構築済み**
 
 設定 `mind.compiler.docker`（または `mind.compiler.path`）が設定されているときのみ有効。
-呼び出し先は M-1 で作った `docker/bin/mindc` ラッパーで、**文字コード変換はすでにこのラッパーが担当している**。
+呼び出し先は **素の `mind` コマンド**（`mindc` ラッパーは使わない）。
+文字コード変換とオフセットの逆変換は `@mindls/compiler` が持つ。理由は `docs/COMPILER-BACKEND.md` 4 章。
 
 ```
 保存
- └→ docker compose run --rm --no-TTY mind bash -c 'cd /work/<相対パス> && mindc <base> file'
+ └→ docker exec <常駐コンテナ> mind <base> file   # 一時ディレクトリの中で実行
       └→ mindc が .mindbuild/ に EUC-JP の影ソースを生成
       └→ 本物の mind がコンパイル（前回の .inf は mindc が削除済み）
       └→ 出力と .inf を EUC-JP → UTF-8 に戻して元の場所へ書き戻す
@@ -483,7 +482,7 @@ MindLS/
 
 | 手段 | 状態 | 用途 |
 |---|---|---|
-| **Docker `linux/386` + Mind 8 for Linux** | ✅ 構築済み | 既定。診断と M0 の差分テスト |
+| **Docker `linux/amd64` + Mind 8 for Linux** | ✅ 構築済み | 既定。診断と M0 の差分テスト |
 | Windows マシン / VM に Mind 9 | 未着手 | Mind 9 固有単語・GUI 編の検証 |
 | コンパイラ連携なし（自前診断のみ） | いつでも可 | macOS 単体・CI 軽量パス |
 
@@ -525,7 +524,7 @@ UTF-8 へ変換して取り込む。**Mind 本体は再配布しない**（`vend
 
 | 旧リスク | 結果 |
 |---|---|
-| Mind 処理系が手元で動かない | **解消**。`linux/386` Docker + Mind 8 for Linux で疎通確認済み（`docs/DOCKER.md`） |
+| Mind 処理系が手元で動かない | **解消**。`linux/amd64` Docker + Mind 8 for Linux で疎通確認済み（`docs/COMPILER-BACKEND.md`） |
 | 標準単語辞書が入手できない（`.sym` はバイナリ） | **解消**。`pmind/file/*.src` 46 本が同梱されており、辞書は自動生成できる |
 
 ### 現在のリスク
@@ -576,7 +575,7 @@ Docker 環境が動いたので、**「実物から取れるものを先に取�
 1. **`make inspect` の出力を保存**し、`.inf` の実物を得る
    （文法エラー入りの `.src` を 1 本書いてコンパイルする）→ M5 のパーサ仕様が確定する
 2. **標準ライブラリソースを取り出す**
-   `docker compose run --rm mind bash -c 'cp -r /opt/mind/pmind/file /work/vendor/stdlib-src'`
+   `npm run gen:stdlib   # 配布物の tgz から直接読む。Docker は不要`
    → M4 の辞書生成と M2 の `fixtures/` が同時に手に入る
 3. `MindLS/` に npm workspaces のスケルトンを作る
 4. `mind-core/src/normalizer.ts` + マニュアル由来のゴールデンテスト（M0）
@@ -589,7 +588,7 @@ Docker 環境が動いたので、**「実物から取れるものを先に取�
 
 ### リポジトリ内
 
-- **`docs/DOCKER.md`** — Mind 処理系の Docker 環境（構築済み・本書 2.7 / M5 の実装根拠）
+- **`docs/COMPILER-BACKEND.md`** — 実 Mind コンパイラとの結合（構築済み・本書 2.7 / M5 の実装根拠）
 
 ### 公式
 
