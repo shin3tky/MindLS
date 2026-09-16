@@ -6,16 +6,38 @@
  */
 
 import {
+  CompletionItemKind,
   DiagnosticSeverity,
+  InsertTextFormat,
+  MarkupKind,
   SymbolKind,
+  type CompletionItem,
   type Diagnostic,
   type DocumentSymbol,
+  type Hover,
   type Range as LspRange,
 } from 'vscode-languageserver/node';
 import type { TextDocument } from 'vscode-languageserver-textdocument';
 
-import { buildSymbolTable, documentSymbols, parse } from '@mindls/core';
-import type { DocumentSymbolNode, ParseResult, Range, SymbolTable } from '@mindls/core';
+import { createRequire } from 'node:module';
+
+import {
+  buildSymbolTable,
+  createStdlibIndex,
+  documentSymbols,
+  EMPTY_STDLIB,
+  parse,
+} from '@mindls/core';
+import type {
+  CompletionItem as CoreCompletionItem,
+  DocumentSymbolNode,
+  HoverInfo,
+  ParseResult,
+  Range,
+  StdlibDocument,
+  StdlibIndex,
+  SymbolTable,
+} from '@mindls/core';
 
 export interface Analysis {
   readonly version: number;
@@ -128,4 +150,57 @@ function toDocumentSymbol(node: DocumentSymbolNode): DocumentSymbol {
 
 export function toDocumentSymbols(parsed: ParseResult): DocumentSymbol[] {
   return documentSymbols(parsed).map(toDocumentSymbol);
+}
+
+// --- 標準単語辞書 ------------------------------------------------------------
+
+/**
+ * 標準単語辞書を読み込む。配布物から生成してコミットしてあるものなので、
+ * Mind の配布物も Docker も要らない。
+ */
+function loadStdlib(): StdlibIndex {
+  try {
+    const require = createRequire(import.meta.url);
+    const doc = require('@mindls/core/stdlib') as StdlibDocument;
+    return createStdlibIndex(doc);
+  } catch {
+    return EMPTY_STDLIB;
+  }
+}
+
+let stdlibCache: StdlibIndex | undefined;
+
+export function stdlib(): StdlibIndex {
+  stdlibCache ??= loadStdlib();
+  return stdlibCache;
+}
+
+// --- 補完・ホバーの変換 ------------------------------------------------------
+
+const COMPLETION_KIND: Record<string, CompletionItemKind> = {
+  local: CompletionItemKind.Variable,
+  document: CompletionItemKind.Function,
+  keyword: CompletionItemKind.Keyword,
+  snippet: CompletionItemKind.Snippet,
+  stdlib: CompletionItemKind.Function,
+};
+
+export function toCompletionItems(items: readonly CoreCompletionItem[]): CompletionItem[] {
+  return items.map((i) => ({
+    label: i.label,
+    kind: COMPLETION_KIND[i.source] ?? CompletionItemKind.Text,
+    detail: i.detail,
+    documentation: i.documentation ?? undefined,
+    filterText: i.filterText,
+    sortText: i.sortText,
+    insertTextFormat: i.isSnippet ? InsertTextFormat.Snippet : InsertTextFormat.PlainText,
+    textEdit: { range: toLspRange(i.range), newText: i.insertText },
+  }));
+}
+
+export function toHover(info: HoverInfo): Hover {
+  return {
+    contents: { kind: MarkupKind.Markdown, value: info.contents },
+    range: toLspRange(info.range),
+  };
 }

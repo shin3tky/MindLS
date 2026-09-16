@@ -18,7 +18,7 @@ import {
 } from 'vscode-languageserver/node';
 import { TextDocument } from 'vscode-languageserver-textdocument';
 
-import { findDefinition, findReferences, searchSymbols } from '@mindls/core';
+import { completionsAt, findDefinition, findReferences, hoverAt, searchSymbols } from '@mindls/core';
 
 import {
   analyze,
@@ -26,7 +26,10 @@ import {
   cachedAnalysis,
   forget,
   toDiagnostics,
+  stdlib,
+  toCompletionItems,
   toDocumentSymbols,
+  toHover,
   toLspRange,
   toSymbolKind,
 } from './analysis.ts';
@@ -39,6 +42,8 @@ export function startServer(connection: Connection = createConnection(ProposedFe
       textDocumentSync: TextDocumentSyncKind.Incremental,
       documentSymbolProvider: true,
       definitionProvider: true,
+      hoverProvider: true,
+      completionProvider: { resolveProvider: false, triggerCharacters: [] },
       referencesProvider: true,
       workspaceSymbolProvider: true,
     },
@@ -87,6 +92,34 @@ export function startServer(connection: Connection = createConnection(ProposedFe
     return findReferences(parsed, symbols, position, {
       includeDeclaration: context.includeDeclaration,
     }).map((r) => ({ uri: doc.uri, range: toLspRange(r) }));
+  });
+
+  connection.onCompletion(({ textDocument, position }) => {
+    const doc = documents.get(textDocument.uri);
+    if (doc === undefined) return [];
+    const { parsed, symbols } = analyze(doc);
+    const lineText = doc.getText({
+      start: { line: position.line, character: 0 },
+      end: { line: position.line + 1, character: 0 },
+    }).replace(/\r?\n$/, '');
+
+    return toCompletionItems(
+      completionsAt({ parsed, symbols, stdlib: stdlib(), lineText, position }),
+    );
+  });
+
+  connection.onHover(({ textDocument, position }) => {
+    const doc = documents.get(textDocument.uri);
+    if (doc === undefined) return null;
+    const { parsed, symbols } = analyze(doc);
+    const info = hoverAt({
+      parsed,
+      symbols,
+      stdlib: stdlib(),
+      lines: doc.getText().split(/\r?\n/),
+      position,
+    });
+    return info === null ? null : toHover(info);
   });
 
   connection.onWorkspaceSymbol(({ query }): SymbolInformation[] => {

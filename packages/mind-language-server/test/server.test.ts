@@ -53,6 +53,7 @@ describe('Language Server（実プロセス）', () => {
       definitionProvider: true,
       referencesProvider: true,
       workspaceSymbolProvider: true,
+      hoverProvider: true,
     });
     await fresh.dispose();
   }, 20_000);
@@ -131,6 +132,53 @@ describe('Language Server（実プロセス）', () => {
     }>;
     expect(symbols.map((s) => s.name)).toContain('使い方を表示');
   });
+
+  it('補完が出る（完了条件: 「表」で表示系）', async () => {
+    const line = lineOf('使い方を表示すること');
+    const result = (await client.request('textDocument/completion', {
+      textDocument: { uri: URI },
+      position: { line, character: 3 },
+    })) as Array<{ label: string }>;
+
+    const labels = result.map((r) => r.label);
+    expect(labels).toContain('表示');
+    expect(labels).toContain('一行表示');
+    expect(labels).toContain('数値表示');
+    expect(labels).toContain('使い方を表示');
+  }, 20_000);
+
+  it('補完に局所変数とスニペットが含まれる', async () => {
+    const line = lineOf('入力名に　入れ');
+    const result = (await client.request('textDocument/completion', {
+      textDocument: { uri: URI },
+      position: { line, character: 2 },
+    })) as Array<{ label: string; insertTextFormat?: number }>;
+
+    expect(result.map((r) => r.label)).toContain('入力名');
+    expect(result.find((r) => r.label === 'ここから')?.insertTextFormat).toBe(2);
+  }, 20_000);
+
+  it('ホバーでスタック仕様が出る', async () => {
+    const line = lineOf('オープンし　エラー検査し');
+    const hover = (await client.request('textDocument/hover', {
+      textDocument: { uri: URI },
+      position: { line, character: charOf('オープンし　エラー検査し', 'エラー検査し') },
+    })) as { contents: { value: string } };
+
+    expect(hover.contents.value).toContain('**エラー検査**');
+    expect(hover.contents.value).toContain('・  →  ・');
+  }, 20_000);
+
+  it('標準単語のホバーは出典を示す', async () => {
+    const line = lineOf('一行表示すること');
+    const hover = (await client.request('textDocument/hover', {
+      textDocument: { uri: URI },
+      position: { line, character: charOf('一行表示すること', '一行表示') },
+    })) as { contents: { value: string } } | null;
+
+    expect(hover?.contents.value).toContain('**一行表示**');
+    expect(hover?.contents.value).toContain('標準ライブラリ file');
+  }, 20_000);
 
   it('公式サンプルでも定義ジャンプが効く', async () => {
     const path = join(REPO, 'fixtures', 'mind-samples', 'sample-05-revline.src');

@@ -42,3 +42,9 @@ export type {
   ReferenceOptions,
   SymbolMatch,
 } from './queries.ts';
+export { completionsAt, currentWordPrefix, SNIPPETS } from './completion.ts';
+export type { CompletionContext, CompletionItem, CompletionSource } from './completion.ts';
+export { hoverAt } from './hover.ts';
+export type { HoverContext, HoverInfo } from './hover.ts';
+export { createStdlibIndex, EMPTY_STDLIB } from './stdlib.ts';
+export type { StdlibDocument, StdlibIndex, StdlibWord } from './stdlib.ts';

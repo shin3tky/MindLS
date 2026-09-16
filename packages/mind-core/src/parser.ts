@@ -266,7 +266,14 @@ export function parse(source: string): ParseResult {
       severity: 'error',
       code: 'unterminated-definition',
     });
-    closeDefinition(current.def.range.end);
+    // 入力中の定義は `。` がまだ無いのが普通。範囲をソース末尾まで伸ばしておかないと、
+    // 「いまどの定義の中にいるか」が取れず、局所変数の補完が効かなくなる。
+    // 末尾トークンではなくソースの末尾まで伸ばす（空白だけの行にカーソルがある場合のため）。
+    const sourceLines = source.split(/\r?\n/);
+    closeDefinition({
+      line: sourceLines.length - 1,
+      character: (sourceLines[sourceLines.length - 1] ?? '').length,
+    });
   }
 
   return {
