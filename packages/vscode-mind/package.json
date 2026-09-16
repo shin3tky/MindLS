@@ -5,16 +5,28 @@
   "version": "0.0.1",
   "private": true,
   "license": "Apache-2.0",
-  "engines": { "vscode": "^1.90.0" },
-  "categories": ["Programming Languages"],
+  "engines": {
+    "vscode": "^1.90.0"
+  },
+  "categories": [
+    "Programming Languages"
+  ],
   "main": "./dist/extension.js",
-  "scripts": { "build": "tsc --build" },
+  "scripts": {
+    "build": "tsc --build"
+  },
   "contributes": {
     "languages": [
       {
         "id": "mind",
-        "aliases": ["Mind", "mind"],
-        "extensions": [".src", ".mnd"],
+        "aliases": [
+          "Mind",
+          "mind"
+        ],
+        "extensions": [
+          ".src",
+          ".mnd"
+        ],
         "configuration": "./language-configuration.json"
       }
     ],
@@ -29,6 +41,11 @@
       {
         "command": "mind.configureWorkspace",
         "title": "Mind: このワークスペースの文字コードと関連付けを設定する",
+        "category": "Mind"
+      },
+      {
+        "command": "mind.restartServer",
+        "title": "Mind: Language Server を再起動する",
         "category": "Mind"
       }
     ],
@@ -52,5 +69,12 @@
         }
       }
     }
-  }
+  },
+  "dependencies": {
+    "@mindls/language-server": "*",
+    "vscode-languageclient": "^10.1.1"
+  },
+  "activationEvents": [
+    "onLanguage:mind"
+  ]
 }

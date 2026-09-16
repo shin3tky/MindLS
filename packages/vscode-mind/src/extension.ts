@@ -1,11 +1,60 @@
 /**
  * VS Code 拡張の入口。
  *
- * M1 の時点では言語登録・文法・言語設定と、文字コードを整えるコマンドだけ。
- * Language Server の起動（別プロセス / stdio）は M3 以降でここに足す。
+ * 言語登録・文法・言語設定に加えて、Language Server を別プロセスで起動する。
+ * 解析そのものは @mindls/core、LSP の受け口は @mindls/language-server が持つ。
  */
 
+import * as path from 'node:path';
+
 import * as vscode from 'vscode';
+import {
+  LanguageClient,
+  TransportKind,
+  type LanguageClientOptions,
+  type ServerOptions,
+} from 'vscode-languageclient/node';
+
+let client: LanguageClient | undefined;
+
+/** Language Server の実体を探す。開発中はワークスペース内の隣のパッケージを見る。 */
+function resolveServerModule(context: vscode.ExtensionContext): string {
+  try {
+    return require.resolve('@mindls/language-server/dist/cli.js');
+  } catch {
+    return context.asAbsolutePath(
+      path.join('..', 'mind-language-server', 'dist', 'cli.js'),
+    );
+  }
+}
+
+async function startLanguageServer(context: vscode.ExtensionContext): Promise<void> {
+  const module = resolveServerModule(context);
+  const serverOptions: ServerOptions = {
+    run: { module, transport: TransportKind.stdio },
+    debug: {
+      module,
+      transport: TransportKind.stdio,
+      options: { execArgv: ['--nolazy', '--inspect=6019'] },
+    },
+  };
+
+  const clientOptions: LanguageClientOptions = {
+    documentSelector: [{ scheme: 'file', language: 'mind' }],
+    synchronize: {
+      fileEvents: vscode.workspace.createFileSystemWatcher('**/*.{src,mnd}'),
+    },
+  };
+
+  client = new LanguageClient('mind', 'Mind Language Server', serverOptions, clientOptions);
+  await client.start();
+}
+
+async function stopLanguageServer(): Promise<void> {
+  const running = client;
+  client = undefined;
+  if (running !== undefined) await running.stop();
+}
 
 /** Mind のソースが取りうる文字コード。プラットフォームで決まる。 */
 function encodingForPlatform(): { id: string; label: string } {
@@ -62,9 +111,22 @@ export function activate(context: vscode.ExtensionContext): void {
     vscode.commands.registerCommand('mind.configureWorkspace', () => {
       void configureWorkspace();
     }),
+    vscode.commands.registerCommand('mind.restartServer', () => {
+      void (async () => {
+        await stopLanguageServer();
+        await startLanguageServer(context);
+        void vscode.window.showInformationMessage('Mind Language Server を再起動しました。');
+      })();
+    }),
   );
+
+  void startLanguageServer(context).catch((error: unknown) => {
+    void vscode.window.showErrorMessage(
+      `Mind Language Server を起動できませんでした: ${String(error)}`,
+    );
+  });
 }
 
-export function deactivate(): void {
-  // Language Server を起動するようになったらここで停止させる
+export function deactivate(): Thenable<void> {
+  return stopLanguageServer();
 }

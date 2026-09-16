@@ -1,0 +1,157 @@
+import { readFileSync } from 'node:fs';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+
+import { LspClient } from './helpers/client.ts';
+
+const REPO = join(dirname(fileURLToPath(import.meta.url)), '..', '..', '..');
+const URI = 'file:///tmp/revline.src';
+
+const SOURCE = [
+  '入力ファイルは　ファイル。',
+  '',
+  '使い方を表示とは　（・　→　・）',
+  '　　「Usage:」を　一行表示すること。',
+  '',
+  'エラー検査は　　（・  →  ・）',
+  '　　エラー？',
+  '　　　　ならば　エラー文字列で　重大エラー',
+  '　　　　つぎに。',
+  '',
+  'メインとは',
+  '　　入力名は　文字列',
+  '　　起動引数（１）を　入力名に　入れ',
+  '　　入力名で　入力ファイルを　オープンし　エラー検査し',
+  '　　入力ファイルを　クローズし　エラー検査し',
+  '　　使い方を表示すること。',
+].join('\n');
+
+const lineOf = (needle: string): number => SOURCE.split('\n').findIndex((l) => l.includes(needle));
+const charOf = (needle: string, inner: string): number =>
+  SOURCE.split('\n')[lineOf(needle)]!.indexOf(inner) + 1;
+
+describe('Language Server（実プロセス）', () => {
+  let client: LspClient;
+
+  beforeAll(async () => {
+    client = new LspClient();
+    await client.initialize();
+    client.openDocument(URI, SOURCE);
+  }, 20_000);
+
+  afterAll(async () => {
+    await client.dispose();
+  });
+
+  it('能力を宣言する', async () => {
+    const fresh = new LspClient();
+    const result = (await fresh.initialize()) as { capabilities: Record<string, unknown> };
+    expect(result.capabilities).toMatchObject({
+      documentSymbolProvider: true,
+      definitionProvider: true,
+      referencesProvider: true,
+      workspaceSymbolProvider: true,
+    });
+    await fresh.dispose();
+  }, 20_000);
+
+  it('診断を配信する（この入力ではエラー無し）', async () => {
+    const params = (await client.waitForNotification('textDocument/publishDiagnostics')) as {
+      uri: string;
+      diagnostics: Array<{ severity: number; message: string }>;
+    };
+    expect(params.uri).toBe(URI);
+    expect(params.diagnostics.filter((d) => d.severity === 1)).toEqual([]);
+  });
+
+  it('DocumentSymbol を返す', async () => {
+    const symbols = (await client.request('textDocument/documentSymbol', {
+      textDocument: { uri: URI },
+    })) as Array<{ name: string; detail: string; children: Array<{ name: string }> }>;
+
+    expect(symbols.map((s) => s.name)).toEqual([
+      '入力ファイル', '使い方を表示', 'エラー検査', 'メイン',
+    ]);
+    const main = symbols.find((s) => s.name === 'メイン')!;
+    expect(main.children.map((c) => c.name)).toEqual(['入力名']);
+  });
+
+  it('定義へジャンプする', async () => {
+    const line = lineOf('オープンし　エラー検査し');
+    const locations = (await client.request('textDocument/definition', {
+      textDocument: { uri: URI },
+      position: { line, character: charOf('オープンし　エラー検査し', 'エラー検査し') },
+    })) as Array<{ uri: string; range: { start: { line: number } } }>;
+
+    expect(locations).toHaveLength(1);
+    expect(locations[0]!.range.start.line).toBe(lineOf('エラー検査は'));
+  });
+
+  it('送り仮名が違っても同じ定義へ飛ぶ', async () => {
+    const line = lineOf('使い方を表示すること');
+    const locations = (await client.request('textDocument/definition', {
+      textDocument: { uri: URI },
+      position: { line, character: 3 },
+    })) as Array<{ range: { start: { line: number } } }>;
+    expect(locations[0]!.range.start.line).toBe(lineOf('使い方を表示とは'));
+  });
+
+  it('参照を列挙する', async () => {
+    const line = lineOf('エラー検査は');
+    const locations = (await client.request('textDocument/references', {
+      textDocument: { uri: URI },
+      position: { line, character: 2 },
+      context: { includeDeclaration: false },
+    })) as Array<{ range: { start: { line: number } } }>;
+
+    expect(locations.map((l) => l.range.start.line).sort((a, b) => a - b)).toEqual([
+      lineOf('オープンし　エラー検査し'),
+      lineOf('クローズし　エラー検査し'),
+    ]);
+  });
+
+  it('局所変数の参照はその定義の中に閉じる', async () => {
+    const line = lineOf('入力名は　文字列');
+    const locations = (await client.request('textDocument/references', {
+      textDocument: { uri: URI },
+      position: { line, character: 2 },
+      context: { includeDeclaration: true },
+    })) as Array<{ range: { start: { line: number } } }>;
+    const lines = locations.map((l) => l.range.start.line);
+    expect(lines).toContain(lineOf('入力名は　文字列'));
+    expect(lines).toContain(lineOf('入力名に　入れ'));
+    expect(lines.every((l) => l >= lineOf('メインとは'))).toBe(true);
+  });
+
+  it('横断検索で正規形から引ける', async () => {
+    const symbols = (await client.request('workspace/symbol', { query: '表示' })) as Array<{
+      name: string;
+    }>;
+    expect(symbols.map((s) => s.name)).toContain('使い方を表示');
+  });
+
+  it('公式サンプルでも定義ジャンプが効く', async () => {
+    const path = join(REPO, 'fixtures', 'mind-samples', 'sample-05-revline.src');
+    let text: string;
+    try {
+      text = readFileSync(path, 'utf8');
+    } catch {
+      return; // 配布物が展開されていない環境では飛ばす
+    }
+    const uri = 'file:///tmp/official-revline.src';
+    client.openDocument(uri, text);
+
+    const lines = text.split('\n');
+    const useLine = lines.findIndex((l) => l.includes('オープンし　エラー検査し'));
+    const defLine = lines.findIndex((l) => l.startsWith('エラー検査は'));
+    expect(useLine).toBeGreaterThan(0);
+
+    const locations = (await client.request('textDocument/definition', {
+      textDocument: { uri },
+      position: { line: useLine, character: lines[useLine]!.indexOf('エラー検査し') + 1 },
+    })) as Array<{ range: { start: { line: number } } }>;
+    expect(locations[0]!.range.start.line).toBe(defLine);
+  }, 20_000);
+});

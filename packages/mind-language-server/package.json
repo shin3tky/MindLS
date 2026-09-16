@@ -4,9 +4,20 @@
   "private": true,
   "type": "module",
   "description": "Mind の Language Server（LSP / stdio）",
-  "bin": { "mind-language-server": "./dist/cli.js" },
+  "bin": {
+    "mind-language-server": "./dist/cli.js"
+  },
   "main": "./dist/server.js",
   "types": "./dist/server.d.ts",
-  "files": ["dist"],
-  "scripts": { "build": "tsc --build" }
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc --build"
+  },
+  "dependencies": {
+    "@mindls/core": "*",
+    "vscode-languageserver": "^10.1.1",
+    "vscode-languageserver-textdocument": "^1.0.14"
+  }
 }

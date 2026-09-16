@@ -26,3 +26,19 @@ export type {
 export { buildSymbolTable, resolve, visibleSymbols } from './symbols.ts';
 export type { SymbolEntry, SymbolTable } from './symbols.ts';
 export { BLOCK_SPECS, blockRoleOf, DECLARATION_KEYWORDS, DEFINITION_KEYWORDS } from './keywords.ts';
+export {
+  comparePosition,
+  containsPosition,
+  documentSymbols,
+  enclosingDefinition,
+  findDefinition,
+  findReferences,
+  searchSymbols,
+  wordAt,
+} from './queries.ts';
+export type {
+  DefinitionResult,
+  DocumentSymbolNode,
+  ReferenceOptions,
+  SymbolMatch,
+} from './queries.ts';

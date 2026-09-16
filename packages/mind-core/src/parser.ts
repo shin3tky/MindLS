@@ -354,12 +354,34 @@ function readHeader(head: Token, rest: readonly Token[], visibility: Visibility)
     }
   }
 
+  // 種別キーワードが無いときの判断。
+  //   `○○とは …` は処理単語（`とは` は `は` でも可）
+  //   `○○は　△△。` のように同じ行が `。` で閉じていれば、△△ 型の変数宣言
+  //     （`入力ファイルは　ファイル。` の `ファイル` はライブラリ定義の型）
+  const terminatedHere = rest.some((t) => t.kind === 'terminator');
+  const lastWord = words.at(-1);
+
   const kind =
     defKindToken !== undefined
       ? DEFINITION_KEYWORDS.get(defKindToken.normalized)!
       : head.particle === 'とは'
         ? '処理単語'
-        : '不明';
+        : terminatedHere && lastWord !== undefined
+          ? lastWord.raw
+          : '処理単語';
+
+  if (defKindToken === undefined && head.particle === 'は' && terminatedHere && lastWord !== undefined) {
+    return {
+      type: 'declaration',
+      declaration: {
+        name: toRef(head),
+        kind: lastWord.raw,
+        visibility,
+        equivalentTo: null,
+        range: { start: head.range.start, end: lastWord.range.end },
+      },
+    };
+  }
 
   return {
     type: 'definition',

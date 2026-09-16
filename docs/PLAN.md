@@ -4,7 +4,7 @@
 　　　言語仕様は Version 9 を基準。検証環境は Linux 版が最新の **Version 8**（後述 2.5）
 成果物: VS Code 向け拡張 + LSP 準拠 Language Server
 実装スタック: **TypeScript 一本**（`vscode-languageserver-node`）
-最終更新: 2026-09-16（Mind-Docker への分離、M0 / M1 / M2 完了、標準単語辞書の生成を反映）
+最終更新: 2026-09-16（Mind-Docker への分離、M0 〜 M3 完了、標準単語辞書の生成を反映）
 
 > **更新履歴**
 > - 2026-09-14 初版
@@ -14,7 +14,9 @@
 >   **標準単語辞書 `stdlib.json` を生成**（file ライブラリ 692 語 global / 266 語 local）。
 > - 2026-09-16 **M1（拡張スケルトン + ハイライト）完了**。tmLanguage をトークン化テストで固定。
 > - 2026-09-16 **M2（レキサ / パーサ / シンボルテーブル）完了**。
->   実ソース 61 本がエラー無しで解析でき、辞書生成もパーサの上に載せ替えた（216 件 green）。
+>   実ソース 61 本がエラー無しで解析でき、辞書生成もパーサの上に載せ替えた。
+> - 2026-09-16 **M3（DocumentSymbol / 定義ジャンプ / 参照）完了**。
+>   Language Server を実プロセスで起動する結合テストつき（244 件 green）。
 >   「確認したい事項」のうち 2 件が解決し、M0 の差分テストと M4 の辞書自動生成が実行可能になった
 
 ---
@@ -328,17 +330,20 @@ MindLS/
 │  │  ├─ ✅ src/keywords.ts       # 制御構文・宣言語の表（キーは正規形）
 │  │  ├─ ✅ src/parser.ts         # 定義/宣言の構造化とブロック対応の診断
 │  │  ├─ ✅ src/symbols.ts        # 正規形をキーにしたシンボルテーブル
+│  │  ├─ ✅ src/queries.ts        # 定義ジャンプ・参照・DocumentSymbol・横断検索
 │  │  ├─ ✅ data/stdlib.json      # 標準単語辞書（生成物だがコミットする）
 │  │  └─ ✅ test/                 # Vitest ゴールデンテスト
 │  ├─ mind-compiler/              # 実処理系アダプタ
 │  │  └─ ⬜ src/{adapter,docker,local,inf-parser,offset-map}.ts
 │  ├─ mind-language-server/
-│  │  └─ ⬜ src/{server,handlers/,diagnostics/}.ts
+│  │  ├─ ✅ src/server.ts         # LSP の配線（stdio）
+│  │  ├─ ✅ src/analysis.ts       # 解析結果のキャッシュと LSP 型への変換
+│  │  └─ ✅ test/                 # サーバを実プロセスで起動する結合テスト
 │  └─ vscode-mind/
 │     ├─ ✅ package.json           # contributes.languages / grammars / configuration / commands
 │     ├─ ✅ language-configuration.json
 │     ├─ ✅ syntaxes/mind.tmLanguage.json
-│     ├─ ✅ src/extension.ts       # 文字コードと関連付けを設定するコマンド
+│     ├─ ✅ src/extension.ts       # LanguageClient の起動・文字コード設定コマンド
 │     └─ ✅ test/                  # vscode-textmate でのトークン化テスト
 ├─ tools/
 │  ├─ ✅ gen-stdlib-dict.ts       # 配布物から標準単語辞書を生成（Docker 不要）
@@ -462,12 +467,49 @@ MindLS には取り込まない。二重メンテを避けるため、結合点�
 `corpus.test.ts` は「コミット済みの `stdlib.json` が最新か」も検査する。
 配布物が無い環境では実ソースのテストだけ自動的に飛ばす。
 
-### M3 — Document Symbol / 定義ジャンプ / 参照（2〜3 日）
+### M3 — Document Symbol / 定義ジャンプ / 参照 — **完了** ✅
 
-- `documentSymbol`: 処理単語をトップ、局所変数・局所処理単語を子に
-- `workspace/symbol`: 正規化キーでの横断検索（`ひょうじ` でも `表示` がヒットする）
-- `definition` / `references`: 正規化キーで照合
-- 完了条件: sample 上でジャンプが正しく動く
+問い合わせのロジックは `packages/mind-core/src/queries.ts` に純関数として置き、
+LSP の配線は `packages/mind-language-server/` が持つ。エディタ無しでテストできる形にした。
+
+| 機能 | LSP メソッド | 実装 |
+|---|---|---|
+| アウトライン | `textDocument/documentSymbol` | 定義・宣言を並べ、局所変数を子にする |
+| 定義ジャンプ | `textDocument/definition` | 正規形で照合。局所 → 大域の順に解決 |
+| 参照検索 | `textDocument/references` | 局所変数はその定義の中に閉じる |
+| 横断検索 | `workspace/symbol` | 正規形と生表記の両方を見る |
+| 診断 | `textDocument/publishDiagnostics` | M2 のパーサ診断 + `終り。` 以降のグレーアウト |
+
+拡張側は `vscode-languageclient` でサーバを別プロセス（stdio）として起動する。
+`Mind: Language Server を再起動する` コマンドも用意した。
+
+#### 設計で効いたところ
+
+- **照合キーが正規形なので、`表示し` の上でジャンプしても `表示とは` の定義に飛ぶ。**
+  送り仮名の違いは意識しなくてよい
+- **参照範囲から助詞を外している。** `作業を` の参照は `作業` の範囲だけを返すので、
+  ハイライトやリネームが助詞を巻き込まない
+- **等価定義は宣言と参照先の両方を候補にする。** `別名表示` から `表示` まで 1 回で辿れる
+- **局所変数は所有する定義の範囲でフィルタする。** 別の定義の同名変数を拾わない
+
+#### 未対応: 読み仮名での検索
+
+PLAN では `ひょうじ` で `表示` を引けることを挙げていたが、**読み仮名の辞書が要る**。
+形態素解析器を持ち込まずに読みを得る手段が無いため、ここでは見送った。
+標準単語辞書に読みを持たせる案は M4 で検討する。
+いまは正規形・生表記に対する 完全一致 / 前方一致 / 部分一致 / 部分列 で順位づけしている。
+
+#### テスト
+
+| テスト | 件数 |
+|---|---|
+| `queries.test.ts` | 19 |
+| `server.test.ts`（**サーバを実プロセスで起動**して stdio で JSON-RPC を往復） | 9 |
+
+`server.test.ts` はモックを使わず、`node dist/cli.js --stdio` を本当に spawn して
+`initialize` → `didOpen` → `documentSymbol` / `definition` / `references` / `workspace/symbol`
+を実際にやり取りする。配線の間違いもここで落ちる。
+公式サンプル上での定義ジャンプも含めて確認済み。
 
 ### M4 — 補完 / ホバー（3〜4 日）
 
@@ -626,6 +668,7 @@ UTF-8 へ変換して取り込む。**Mind 本体は再配布しない**（`vend
 | ~~M0 正規化~~ | **完了** ✅ |
 | ~~M1 ハイライト~~ | **完了** ✅ |
 | ~~M2 パーサ/シンボル~~ | **完了** ✅ |
+| ~~M3 ジャンプ/参照~~ | **完了** ✅ |
 | M0 正規化 PoC | 1〜2 日（+ 差分テストドライバ 1 日） |
 | M1 ハイライト | 2〜3 日 |
 | M2 パーサ/シンボル | 3〜5 日 |
