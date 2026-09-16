@@ -1,0 +1,40 @@
+#!/usr/bin/env bash
+#
+# mind-inspect - コンテナに入っている Mind 配布物の中身を調べる
+#
+# docs/PLAN.md の「確認したい事項」に答えるための道具:
+#   ・標準ライブラリのソース (.src) が同梱されているか
+#   ・sample / sampleF / tool にどんなソースがあるか
+#   ・bin に何が入っているか（コンパイラ・ランタイムの実体）
+
+set -euo pipefail
+
+ROOT="${MIND_ROOT:-/opt/mind/pmind}"
+
+section() { printf '\n=== %s ===\n' "$1"; }
+
+section "MIND_ROOT"
+echo "${ROOT}"
+
+section "bin/"
+ls -l "${ROOT}/bin" 2>/dev/null || echo "(なし)"
+
+section "lib/"
+ls -l "${ROOT}/lib" 2>/dev/null || echo "(なし)"
+
+section "同梱されている .src の総数"
+find "${ROOT}" -name '*.src' -type f 2>/dev/null | wc -l
+
+section ".src をディレクトリ別に集計"
+find "${ROOT}" -name '*.src' -type f 2>/dev/null \
+    | sed "s|^${ROOT}/||; s|/[^/]*$||" \
+    | sort | uniq -c | sort -rn
+
+section "ライブラリらしき .src（先頭 40 件）"
+find "${ROOT}" -name '*.src' -type f 2>/dev/null | sort | head -n 40
+
+section "ディレクトリ構成（深さ 2）"
+find "${ROOT}" -maxdepth 2 -type d 2>/dev/null | sort
+
+section "ランタイム (mrunt*)"
+find "${ROOT}" -name 'mrunt*' 2>/dev/null || echo "(なし)"

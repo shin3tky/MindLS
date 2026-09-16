@@ -1,0 +1,16 @@
+# 改行コードは LF に固定する。
+# Windows の Git は既定で core.autocrlf=true のため、指定しないとチェックアウト時に
+# CRLF へ変換され、シェルスクリプトや Dockerfile が Linux 側で壊れる。
+* text=auto eol=lf
+
+# Mind のソースは EUC-JP / Shift_JIS のこともあるため Git に内容を触らせない
+*.src -text
+
+# Mind のコンパイル生成物
+*.mco -text
+*.sym binary
+*.his -text
+*.inf -text
+
+# 配布物
+*.tgz binary

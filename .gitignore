@@ -1,0 +1,22 @@
+# Node / TypeScript
+node_modules/
+dist/
+out/
+*.tsbuildinfo
+.vitest/
+coverage/
+
+# Mind のコンパイル生成物
+.mindbuild/
+*.mco
+*.sym
+*.his
+*.inf
+
+# Mind の配布物（再配布しない。Mind-Docker 側で管理する）
+vendor/*.tgz
+
+# VS Code 拡張のパッケージ
+*.vsix
+
+.DS_Store
