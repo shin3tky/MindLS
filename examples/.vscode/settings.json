@@ -1,0 +1,12 @@
+{
+  "//": "このフォルダーを Extension Development Host で開いたときの設定です。",
+  "//2": "本物の Mind のソースは EUC-JP（Linux 版）/ Shift_JIS（Windows 版）ですが、",
+  "//3": "ここのサンプルは読みやすさを優先して UTF-8 にしてあります。",
+  "//4": "実際のプロジェクトでは `Mind: このワークスペースの文字コードと関連付けを設定する` を使ってください。",
+  "files.associations": {
+    "*.src": "mind"
+  },
+  "[mind]": {
+    "files.encoding": "utf8"
+  }
+}

@@ -1,0 +1,34 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "拡張を試す (Extension Development Host)",
+      "type": "extensionHost",
+      "request": "launch",
+      "args": [
+        "--extensionDevelopmentPath=${workspaceFolder}/packages/vscode-mind",
+        "${workspaceFolder}/examples"
+      ],
+      "outFiles": ["${workspaceFolder}/packages/*/dist/**/*.js"],
+      "preLaunchTask": "npm: build"
+    },
+    {
+      "name": "Language Server にアタッチ",
+      "type": "node",
+      "request": "attach",
+      "port": 6019,
+      "restart": true,
+      "sourceMaps": true,
+      "outFiles": ["${workspaceFolder}/packages/mind-language-server/dist/**/*.js"]
+    }
+  ],
+  "compounds": [
+    {
+      "name": "拡張 + Language Server をまとめてデバッグ",
+      "configurations": [
+        "拡張を試す (Extension Development Host)",
+        "Language Server にアタッチ"
+      ]
+    }
+  ]
+}

@@ -86,6 +86,16 @@
           "type": "boolean",
           "default": false,
           "description": "保存時に実 Mind コンパイラで文法チェックする（Docker が必要）。既定は無効で、自前解析だけで動く。"
+        },
+        "mind.trace.server": {
+          "type": "string",
+          "enum": [
+            "off",
+            "messages",
+            "verbose"
+          ],
+          "default": "off",
+          "description": "Language Server とのやりとりを出力パネル「Mind Language Server」に記録する。拡張の開発時だけ使う。"
         }
       }
     }

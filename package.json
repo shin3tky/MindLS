@@ -12,6 +12,7 @@
   ],
   "scripts": {
     "build": "tsc --build",
+    "watch": "tsc --build --watch",
     "clean": "tsc --build --clean",
     "typecheck": "tsc --build --force",
     "test": "vitest run",
