@@ -245,5 +245,7 @@ export function isNegativeForm(raw: string): boolean {
   const folded = foldWidthAndCase(raw);
   if (isAllHiragana(folded)) return false;       // ひらがなのみの語は対象外
   const { droppedKana } = analyzeWord(folded);
-  return NEGATIVE_SUFFIXES.some((suffix) => droppedKana.endsWith(suffix));
+  // `表示しないこと` のように、定義の末尾では `こと` が続く
+  const tail = droppedKana.replace(/(こと|ため|とき)$/, '');
+  return NEGATIVE_SUFFIXES.some((suffix) => tail.endsWith(suffix));
 }

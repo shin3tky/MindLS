@@ -34,34 +34,81 @@ import {
   toSymbolKind,
 } from './analysis.ts';
 
+/**
+ * 診断の設定。既定値はここが唯一の出どころで、拡張の package.json とそろえてある。
+ *
+ * `undefinedWords` だけ既定 false。`"x.src"を　コンパイル。` で取り込まれる
+ * 他ファイルの単語をまだ追えないので、複数ファイルのプログラムでは誤検出になる。
+ */
+interface DiagnosticSettings {
+  undefinedWords: boolean;
+  forwardReferences: boolean;
+  negativeForms: boolean;
+  commentParens: boolean;
+}
+
+const DEFAULT_DIAGNOSTICS: DiagnosticSettings = {
+  undefinedWords: false,
+  forwardReferences: true,
+  negativeForms: true,
+  commentParens: true,
+};
+
+function readDiagnosticSettings(raw: unknown): DiagnosticSettings {
+  const out = { ...DEFAULT_DIAGNOSTICS };
+  if (typeof raw !== 'object' || raw === null) return out;
+  for (const key of Object.keys(out) as (keyof DiagnosticSettings)[]) {
+    const value = (raw as Record<string, unknown>)[key];
+    if (typeof value === 'boolean') out[key] = value;
+  }
+  return out;
+}
+
 export function startServer(connection: Connection = createConnection(ProposedFeatures.all)): void {
   const documents = new TextDocuments(TextDocument);
+  let diagnosticSettings = DEFAULT_DIAGNOSTICS;
 
-  connection.onInitialize((): InitializeResult => ({
-    capabilities: {
-      textDocumentSync: TextDocumentSyncKind.Incremental,
-      documentSymbolProvider: true,
-      definitionProvider: true,
-      hoverProvider: true,
-      completionProvider: { resolveProvider: false, triggerCharacters: [] },
-      referencesProvider: true,
-      workspaceSymbolProvider: true,
-    },
-    serverInfo: { name: 'mind-language-server' },
-  }));
+  connection.onInitialize((params): InitializeResult => {
+    const options = params.initializationOptions as { diagnostics?: unknown } | undefined;
+    diagnosticSettings = readDiagnosticSettings(options?.diagnostics);
+    return {
+      capabilities: {
+        textDocumentSync: TextDocumentSyncKind.Incremental,
+        documentSymbolProvider: true,
+        definitionProvider: true,
+        hoverProvider: true,
+        completionProvider: { resolveProvider: false, triggerCharacters: [] },
+        referencesProvider: true,
+        workspaceSymbolProvider: true,
+      },
+      serverInfo: { name: 'mind-language-server' },
+    };
+  });
 
   connection.onInitialized(() => {
     void connection.client.register(DidChangeConfigurationNotification.type, undefined);
   });
 
   const publish = (doc: TextDocument): void => {
-    const { parsed } = analyze(doc);
+    const { parsed, symbols } = analyze(doc);
     void connection.sendDiagnostics({
       uri: doc.uri,
       version: doc.version,
-      diagnostics: toDiagnostics(parsed),
+      diagnostics: toDiagnostics(parsed, symbols, {
+        stdlib: stdlib(),
+        undefinedWords: diagnosticSettings.undefinedWords,
+        forwardReferences: diagnosticSettings.forwardReferences,
+        negativeForms: diagnosticSettings.negativeForms,
+        commentParens: diagnosticSettings.commentParens,
+      }),
     });
   };
+
+  connection.onDidChangeConfiguration((change) => {
+    const settings = (change.settings as { mind?: { diagnostics?: unknown } } | undefined)?.mind;
+    diagnosticSettings = readDiagnosticSettings(settings?.diagnostics);
+    for (const doc of documents.all()) publish(doc);
+  });
 
   documents.onDidOpen((e) => { publish(e.document); });
   documents.onDidChangeContent((e) => { publish(e.document); });

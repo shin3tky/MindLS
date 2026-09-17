@@ -57,6 +57,26 @@
           "default": "file",
           "description": "リンクする標準ライブラリ。GUI 編なら guilib。"
         },
+        "mind.diagnostics.undefinedWords": {
+          "type": "boolean",
+          "default": false,
+          "description": "定義されていない単語を指摘する。`\"x.src\"を　コンパイル。` で取り込む他ファイルの単語をまだ追えないため、複数ファイルのプログラムでは誤検出になる。既定は無効。"
+        },
+        "mind.diagnostics.forwardReferences": {
+          "type": "boolean",
+          "default": true,
+          "description": "定義より前で引用している単語を指摘する。Mind は前方参照できず、`仮定義` が要る。"
+        },
+        "mind.diagnostics.negativeForms": {
+          "type": "boolean",
+          "default": true,
+          "description": "`表示しない` のような否定形を指摘する。送り仮名は照合前に落ちるので、肯定形と同じ単語になってしまう。"
+        },
+        "mind.diagnostics.commentParens": {
+          "type": "boolean",
+          "default": true,
+          "description": "コメントのつもりで書かれた `（ … ）` のうち、前後の空白が足りずに単語の一部になっているものを指摘する。"
+        },
         "mind.compiler.docker.image": {
           "type": "string",
           "default": "mind-docker:8.0.08",

@@ -107,10 +107,32 @@ export function buildSymbolTable(result: ParseResult): SymbolTable {
     for (const l of def.locals) {
       upsert(own, l.name, l.kind, 'local', { owner: def.name.normalized });
     }
+    // 局所処理単語も同じスコープに置く。親からだけ見える点は局所変数と同じ
+    for (const w of def.localWords) {
+      upsert(own, w.name, w.kind, 'local', {
+        stackSpec: w.stackSpec,
+        owner: def.name.normalized,
+      });
+    }
     if (own.size > 0) {
-      const previous = locals.get(def.name.normalized);
-      const merged = new Map<string, SymbolEntry>(previous ?? []);
-      for (const [k, v] of freeze(own)) merged.set(k, v);
+      // 同じ名前の定義が複数あることがある（`条件コンパイル` で環境ごとに書き分ける）。
+      // あとの定義で上書きすると前の定義の局所シンボルが消え、その中の参照が
+      // 「定義より前」に見えてしまう。位置は捨てずに足し合わせる。
+      const merged = new Map<string, SymbolEntry>(locals.get(def.name.normalized) ?? []);
+      for (const [k, v] of freeze(own)) {
+        const previous = merged.get(k);
+        merged.set(
+          k,
+          previous === undefined
+            ? v
+            : {
+                ...previous,
+                aliases: [...new Set([...previous.aliases, ...v.aliases])],
+                locations: [...previous.locations, ...v.locations],
+                stackSpec: previous.stackSpec ?? v.stackSpec,
+              },
+        );
+      }
       locals.set(def.name.normalized, merged);
     }
   }

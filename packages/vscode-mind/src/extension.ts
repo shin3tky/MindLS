@@ -41,6 +41,9 @@ async function startLanguageServer(context: vscode.ExtensionContext): Promise<vo
 
   const clientOptions: LanguageClientOptions = {
     documentSelector: [{ scheme: 'file', language: 'mind' }],
+    // 起動直後の解析にも設定を効かせたいので、初回分は initializationOptions で渡す。
+    // 以降の変更は workspace/didChangeConfiguration で届く。
+    initializationOptions: { diagnostics: diagnosticSettings() },
     synchronize: {
       fileEvents: vscode.workspace.createFileSystemWatcher('**/*.{src,mnd}'),
     },
@@ -48,6 +51,17 @@ async function startLanguageServer(context: vscode.ExtensionContext): Promise<vo
 
   client = new LanguageClient('mind', 'Mind Language Server', serverOptions, clientOptions);
   await client.start();
+}
+
+/** `mind.diagnostics.*` を Language Server に渡す形にまとめる */
+function diagnosticSettings(): Record<string, boolean> {
+  const config = vscode.workspace.getConfiguration('mind');
+  return {
+    undefinedWords: config.get<boolean>('diagnostics.undefinedWords') ?? false,
+    forwardReferences: config.get<boolean>('diagnostics.forwardReferences') ?? true,
+    negativeForms: config.get<boolean>('diagnostics.negativeForms') ?? true,
+    commentParens: config.get<boolean>('diagnostics.commentParens') ?? true,
+  };
 }
 
 async function stopLanguageServer(): Promise<void> {

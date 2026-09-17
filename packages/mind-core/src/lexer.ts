@@ -51,6 +51,32 @@ const STRING_PAIRS: ReadonlyArray<readonly [string, string]> = [
 
 const CHAR_QUOTES = new Set(["'", '’', '＇']);
 
+/**
+ * 数式表現の角括弧。マニュアル 6「数式表現」によれば、角括弧・丸括弧・句点の 3 種だけは
+ * 例外的に単語と密着して書いてよい。したがって `［1.2` は 1 単語ではなく `［` と `1.2` になる。
+ */
+const OPEN_BRACKETS = new Set(['［', '[']);
+const CLOSE_BRACKETS = new Set(['］', ']']);
+
+/**
+ * 数式表現の演算子（全角・半角どちらも可）。マニュアル 6「数式表現」。
+ * 演算子は単語と密着して書けないので、丸ごと一致したときだけ演算子とみなす。
+ */
+const FORMULA_OPERATORS: ReadonlySet<string> = new Set([
+  '：＝', ':=',
+  '＋', '+',
+  '−', '-', 'ー',
+  '＝', '=',
+  '≠', '＜＞', '<>',
+  '＜', '<',
+  '≦', '＜＝', '<=',
+  '＞', '>',
+  '≧', '＞＝', '>=',
+  '×', '＊', '*',
+  '÷', '／', '/',
+  '％', '%', 'ｍｏｄ', 'mod',
+]);
+
 const OPEN_PARENS = new Set(['（', '(']);
 const CLOSE_PARENS = new Set(['）', ')']);
 
@@ -235,7 +261,9 @@ export function lex(source: string): LexResult {
       continue;
     }
     const range: Range = { start, end: cur.position() };
-    push('word', raw, range);
+    const isOperator =
+      OPEN_BRACKETS.has(raw) || CLOSE_BRACKETS.has(raw[0]!) || FORMULA_OPERATORS.has(raw);
+    push(isOperator ? 'operator' : 'word', raw, range);
 
     // トップレベルの `終り。` でコンパイルは打ち切られる
     if (start.character === 0 && raw === END_OF_COMPILATION) {
@@ -257,10 +285,15 @@ function isCommentParen(cur: Cursor): boolean {
   const before = cur.character === 0 ? null : (line[cur.character - 1] ?? null);
   if (before !== null && !isSeparator(before)) return false;
 
-  // 同じ行の中で閉じ括弧を探す（複数行にまたがる場合は readParenComment 側で処理）
+  // 同じ行の中で対応する閉じ括弧を探す（複数行にまたがる場合は readParenComment 側で処理）。
+  // 入れ子になっていることがある: `（文字列　→　変換結果、合否(1/0)）`
+  let depth = 1;
   for (let i = cur.character + 1; i < line.length; i++) {
     const c = line[i]!;
-    if (CLOSE_PARENS.has(c)) {
+    if (OPEN_PARENS.has(c)) depth += 1;
+    else if (CLOSE_PARENS.has(c)) {
+      depth -= 1;
+      if (depth > 0) continue;
       const after = line[i + 1] ?? null;
       return after === null || isSeparator(after);
     }
@@ -345,11 +378,21 @@ function readString(
 function readWord(cur: Cursor): string {
   const line = cur.currentLine;
   const start = cur.character;
-  let i = start;
 
+  // `［` は次の単語の先頭に密着できるので、それ 1 文字で切る
+  if (OPEN_BRACKETS.has(line[start]!)) {
+    cur.advance(1);
+    return line[start]!;
+  }
+  // `］` は逆に、直後の助詞を伴って `］を` のように書かれる。まとめて 1 つにする
+  const startsWithClose = CLOSE_BRACKETS.has(line[start]!);
+
+  let i = start;
   while (i < line.length) {
     const c = line[i]!;
     if (isSeparator(c) || c === '。' || c === LINE_COMMENT) break;
+    if (i > start && (OPEN_BRACKETS.has(c) || CLOSE_BRACKETS.has(c))) break;
+    if (i > start && startsWithClose && CLOSE_BRACKETS.has(c)) break;
     i += 1;
   }
 

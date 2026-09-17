@@ -203,3 +203,53 @@ describe('Language Server（実プロセス）', () => {
     expect(locations[0]!.range.start.line).toBe(defLine);
   }, 20_000);
 });
+
+describe('診断の配線（実プロセス）', () => {
+  const codesOf = (params: unknown): string[] =>
+    (params as { diagnostics: Array<{ code: string }> }).diagnostics.map((d) => d.code);
+
+  it('前方参照を既定で報告する', async () => {
+    const client = new LspClient();
+    await client.initialize();
+    client.openDocument('file:///tmp/forward.src', 'メインとは\n　二乗し　表示すること。\n二乗とは\n　掛けること。');
+    const params = await client.waitForNotification('textDocument/publishDiagnostics');
+    expect(codesOf(params)).toContain('forward-reference');
+    await client.dispose();
+  }, 20_000);
+
+  it('未定義単語は既定では報告しない', async () => {
+    const client = new LspClient();
+    await client.initialize();
+    client.openDocument('file:///tmp/unknown.src', 'メインとは\n　知らない単語すること。');
+    const params = await client.waitForNotification('textDocument/publishDiagnostics');
+    expect(codesOf(params)).not.toContain('undefined-word');
+    await client.dispose();
+  }, 20_000);
+
+  it('initializationOptions で未定義単語を有効にできる', async () => {
+    const client = new LspClient();
+    await client.initialize({ diagnostics: { undefinedWords: true } });
+    client.openDocument('file:///tmp/unknown2.src', 'メインとは\n　知らない単語すること。');
+    const params = await client.waitForNotification('textDocument/publishDiagnostics');
+    expect(codesOf(params)).toContain('undefined-word');
+    await client.dispose();
+  }, 20_000);
+
+  it('設定変更で診断を切れる', async () => {
+    const client = new LspClient();
+    await client.initialize();
+    const uri = 'file:///tmp/toggle.src';
+    client.openDocument(uri, 'メインとは\n　二乗し　表示すること。\n二乗とは\n　掛けること。');
+    expect(codesOf(await client.waitForNotification('textDocument/publishDiagnostics'))).toContain(
+      'forward-reference',
+    );
+    await new Promise((r) => setTimeout(r, 50));
+    client.drainNotifications('textDocument/publishDiagnostics');
+    client.notify('workspace/didChangeConfiguration', {
+      settings: { mind: { diagnostics: { forwardReferences: false } } },
+    });
+    const params = await client.waitForNotification('textDocument/publishDiagnostics');
+    expect(codesOf(params)).not.toContain('forward-reference');
+    await client.dispose();
+  }, 20_000);
+});

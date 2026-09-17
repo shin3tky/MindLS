@@ -15,7 +15,8 @@ export type TokenKind =
   | 'string'       // 「…」 "…"
   | 'char'         // 'A'
   | 'comment'      // ※行コメント / （ … ） / コンパイル抑止
-  | 'terminator';  // 。
+  | 'terminator'   // 。
+  | 'operator';    // 数式表現 ［ … ］ の括弧と演算子（単語ではない）
 
 export interface Token {
   readonly kind: TokenKind;

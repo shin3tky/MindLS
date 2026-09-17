@@ -10,7 +10,17 @@
  * トップダウン走査でスコープが確定する。これは LSP にとって都合が良い。
  */
 
-import { blockRoleOf, DECLARATION_KEYWORDS, DEFINITION_KEYWORDS, VISIBILITY_GLOBAL, VISIBILITY_LOCAL } from './keywords.ts';
+import {
+  ATTRIBUTE_WORDS,
+  blockRoleOf,
+  DECLARATION_KEYWORDS,
+  DEFINITION_KEYWORDS,
+  TEMPLATE_KIND,
+  TEMPLATE_MEMBER_KIND,
+  VISIBILITY_GLOBAL,
+  VISIBILITY_LOCAL,
+} from './keywords.ts';
+import { normalize } from './normalizer.ts';
 import { lex } from './lexer.ts';
 import type { LexDiagnostic } from './lexer.ts';
 import type { Position, Range, Token } from './types.ts';
@@ -44,6 +54,13 @@ export interface Definition {
   readonly visibility: Visibility;
   /** 定義の冒頭で宣言された局所変数 */
   readonly locals: readonly Declaration[];
+  /**
+   * 局所処理単語（この定義の中だけに見える下位の処理単語）。
+   * `本体とは` より前に並ぶ。親から見えるだけで、外からは見えない。
+   */
+  readonly localWords: readonly Definition[];
+  /** 局所処理単語の場合、それを含む定義の正規形 */
+  readonly owner: string | null;
   readonly range: Range;
 }
 
@@ -107,8 +124,21 @@ export function parse(source: string): ParseResult {
   const declarations: Declaration[] = [];
 
   let visibility: Visibility = 'global';
-  let current: { def: Definition; locals: Declaration[] } | null = null;
+  let current: { def: Definition; locals: Declaration[]; localWords: Definition[] } | null = null;
+  /** 開いている局所処理単語。`。` は付かず、次の `○○とは` か `本体とは` で閉じる */
+  let nested: Definition | null = null;
   const blocks: OpenBlock[] = [];
+
+  /** その行で最初の（コメントでない）トークンか */
+  const isFirstOnLine = (index: number): boolean => {
+    const line = tokens[index]!.range.start.line;
+    for (let k = index - 1; k >= 0; k--) {
+      const t = tokens[k]!;
+      if (t.range.start.line !== line) return true;
+      if (t.kind !== 'comment') return false;
+    }
+    return true;
+  };
 
   /** 同じ行の続きのトークン（コメントを含む） */
   const restOfLine = (from: number): Token[] => {
@@ -122,11 +152,19 @@ export function parse(source: string): ParseResult {
     return out;
   };
 
+  const closeNestedWord = (end: Position): void => {
+    if (nested === null || current === null) return;
+    current.localWords.push({ ...nested, range: { start: nested.range.start, end } });
+    nested = null;
+  };
+
   const closeDefinition = (end: Position): void => {
     if (current === null) return;
+    closeNestedWord(end);
     definitions.push({
       ...current.def,
       locals: current.locals,
+      localWords: current.localWords,
       range: { start: current.def.range.start, end },
     });
     current = null;
@@ -163,9 +201,56 @@ export function parse(source: string): ParseResult {
         // 配布物には `○○とは　仮定義　（・ → ・）` と `。` を省いた書き方もある。
         definitions.push(parsed.definition);
       } else {
-        current = { def: parsed.definition, locals: [] };
+        current = { def: parsed.definition, locals: [], localWords: [] };
       }
       continue;
+    }
+
+    // --- 型紙の要素 ---
+    //
+    // `ファイルヘッダ型は　型紙` … `。` の中に `＄＄○○は　ワード変数` が並ぶ。
+    // 要素は `管理テーブルの　＄＄ＥＯＦ` のように外から引用するので大域に置く。
+    if (
+      current !== null &&
+      current.def.kind === TEMPLATE_KIND &&
+      t.kind === 'word' &&
+      t.particle === 'は' &&
+      isFirstOnLine(i)
+    ) {
+      const header = restOfLine(i);
+      const kindToken = header.find((h) => h.kind === 'word') ?? null;
+      declarations.push({
+        name: toRef(t),
+        kind: TEMPLATE_MEMBER_KIND,
+        visibility: 'global',
+        equivalentTo: null,
+        range: { start: t.range.start, end: (kindToken ?? t).range.end },
+      });
+      continue;
+    }
+
+    // --- 局所処理単語（ネストした定義） ---
+    //
+    // 定義の中に、字下げして `下位処理とは` … と並べる書き方。マニュアル 02「局所処理単語」。
+    // 末尾に `。` は付けず、次の `○○とは` が来たところで暗黙に閉じる。
+    // 最後に `本体とは` というダミー宣言を置き、そこから先が親の本体になる。
+    if (
+      current !== null &&
+      t.kind === 'word' &&
+      (t.particle === 'とは' || (t.particle === 'は' && t.normalized === BODY_MARKER)) &&
+      t.range.start.character > 0
+    ) {
+      closeNestedWord(t.range.start);
+      if (t.normalized === BODY_MARKER) {
+        // `本体とは` は語の定義ではなく、親の本体がここから始まるという目印
+        continue;
+      }
+      const header = restOfLine(i);
+      const parsed = readHeader(t, header, 'local');
+      if (parsed.type === 'definition') {
+        nested = { ...parsed.definition, owner: current.def.name.normalized };
+        continue;
+      }
     }
 
     // --- 定義の中の局所宣言 ---
@@ -176,13 +261,11 @@ export function parse(source: string): ParseResult {
       t.range.start.character > 0
     ) {
       const header = restOfLine(i);
-      const kindToken = header.find(
-        (h) => h.kind === 'word' && DECLARATION_KEYWORDS.has(h.normalized),
-      );
-      if (kindToken !== undefined) {
+      const kindToken = localDeclarationKind(t, header, isFirstOnLine(i));
+      if (kindToken !== null) {
         current.locals.push({
           name: toRef(t),
-          kind: DECLARATION_KEYWORDS.get(kindToken.normalized)!,
+          kind: DECLARATION_KEYWORDS.get(kindToken.normalized) ?? kindToken.raw,
           visibility: 'local',
           equivalentTo: null,
           range: { start: t.range.start, end: kindToken.range.end },
@@ -299,7 +382,41 @@ export function parse(source: string): ParseResult {
 
 import { BLOCK_SPECS } from './keywords.ts';
 const SPECS = BLOCK_SPECS;
+/** 局所処理単語の並びを終え、親の本体が始まることを示すダミー宣言 */
+const BODY_MARKER = normalize('本体');
 const BLOCK_INDEX = new Map(SPECS.map((s, i) => [s, i] as const));
+
+/**
+ * 定義の中の `○○は　△△` を局所宣言とみなすか判定し、型の語を返す。
+ *
+ * `△△` がキーワード（`変数` `文字列` など）ならそれで確定する。
+ * キーワードでなくても、型はユーザ定義でありうる。
+ *
+ *   管理テーブルは　ファイル情報          ← `ファイル情報` は型紙由来の型名
+ *
+ * これを拾わないと標準ライブラリの局所変数がごっそり未定義語に見える。
+ * ただし本文の普通の行を宣言と誤認しないよう、行頭で始まり、
+ * うしろに語が 1 つだけ続き、助詞が付いていない場合に限る。
+ */
+function localDeclarationKind(
+  head: Token,
+  rest: readonly Token[],
+  firstOnLine: boolean,
+): Token | null {
+  const words = rest.filter((t) => t.kind === 'word');
+  const keyword = words.find((w) => DECLARATION_KEYWORDS.has(w.normalized));
+  if (keyword !== undefined) return keyword;
+
+  if (!firstOnLine) return null;
+  // `例外は　＿任意進処理` のように、制御構文の語は宣言ではない
+  if (blockRoleOf(head.normalized, head.raw) !== null) return null;
+  if (words.length !== 1) return null;
+  const only = words[0]!;
+  if (only.particle !== null) return null;
+  if (rest.some((t) => t.kind === 'terminator')) return null;
+  if (blockRoleOf(only.normalized, only.raw) !== null) return null;
+  return only;
+}
 
 type HeaderResult =
   | { type: 'declaration'; declaration: Declaration }
@@ -346,7 +463,8 @@ function readHeader(head: Token, rest: readonly Token[], visibility: Visibility)
     };
   }
 
-  // 属性は `処理単語` `関数` のあとに並ぶ英数記号のトークン
+  // 属性は `処理単語` `関数` のあとに並ぶ。`.N` `NN` のような記号形と、
+  // `整数入力` `小数出力` `逆転抑制` のような日本語の属性語がある。
   const attrs: string[] = [];
   if (defKindToken !== undefined) {
     let seen = false;
@@ -356,7 +474,7 @@ function readHeader(head: Token, rest: readonly Token[], visibility: Visibility)
         continue;
       }
       if (!seen) continue;
-      if (/^[.A-Za-z0-9]+$/.test(w.raw)) attrs.push(w.raw);
+      if (/^[.A-Za-z0-9]+$/.test(w.raw) || ATTRIBUTE_WORDS.has(w.normalized)) attrs.push(w.raw);
       else break;
     }
   }
@@ -399,6 +517,8 @@ function readHeader(head: Token, rest: readonly Token[], visibility: Visibility)
       attrs,
       visibility,
       locals: [],
+      localWords: [],
+      owner: null,
       range: { start: head.range.start, end: head.range.end },
     },
   };

@@ -189,14 +189,26 @@ export function documentSymbols(result: ParseResult): DocumentSymbolNode[] {
       kind: def.kind,
       range: def.range,
       selectionRange: def.name.range,
-      children: def.locals.map((l) => ({
-        name: l.name.raw,
-        detail: l.kind,
-        kind: l.kind,
-        range: l.range,
-        selectionRange: l.name.range,
-        children: [],
-      })),
+      children: [
+        ...def.locals.map((l) => ({
+          name: l.name.raw,
+          detail: l.kind,
+          kind: l.kind,
+          range: l.range,
+          selectionRange: l.name.range,
+          children: [] as DocumentSymbolNode[],
+        })),
+        ...def.localWords.map((w) => ({
+          name: w.name.raw,
+          detail: [w.kind, w.stackSpec === null ? null : `（${w.stackSpec}）`]
+            .filter((x) => x !== null && x !== '')
+            .join(' '),
+          kind: w.kind,
+          range: w.range,
+          selectionRange: w.name.range,
+          children: [] as DocumentSymbolNode[],
+        })),
+      ].sort((a, b) => comparePosition(a.range.start, b.range.start)),
     });
   }
 

@@ -7,6 +7,14 @@
  *
  * Docker は要らない。配布物の tgz から直接取り出す。
  *
+ * カーネル組み込み単語（`捨て` `複写` `真？` など）はライブラリソースには無い。
+ * これらは `pmind/kernel/c_words*.wrd` に
+ *   `複写は　アセンブラ定義の処理単語。`
+ * の形で並んでいて、`asmword.src` が `"../kernelF/c_words.wrd"を コンパイルする。`
+ * として取り込んでいる。つまり配布物の中では .wrd もライブラリソースの一部なので、
+ * こちらも同じパーサに通して辞書に入れる。これを入れないと、ごく普通のプログラムでも
+ * 未定義単語だらけに見えてしまう。
+ *
  * 抽出には mind-core のレキサ／パーサをそのまま使う。独自の正規表現を持つと
  * 解析器と辞書がずれる（実際、regex 版は `（…）` コメントを取りこぼしていた）。
  *
@@ -40,6 +48,8 @@ export interface WordEntry {
   /** 処理単語 / 関数に付く属性（.S .N NN など） */
   attrs: string[];
   scope: 'global' | 'local';
+  /** `file` = 標準ライブラリのソース / `kernel` = カーネル組み込み単語表 */
+  source: 'file' | 'kernel';
   /** 仮定義 → 本定義 の形で前方参照されていた語 */
   forwardDeclared?: boolean;
   file: string;
@@ -55,7 +65,10 @@ function parseArgs(argv: string[]) {
   return out;
 }
 
-/** 配布物から pmind/file/*.src を取り出して一時ディレクトリを返す */
+const FILE_GLOB = 'pmind/file/*.src';
+const KERNEL_GLOB = 'pmind/kernel/c_words*.wrd';
+
+/** 配布物から標準ライブラリとカーネル単語表を取り出して一時ディレクトリを返す */
 function extractFromTgz(tgzPath: string): { dir: string; cleanup: () => void } {
   if (!existsSync(tgzPath)) {
     console.error(`配布物が見つかりません: ${tgzPath}`);
@@ -64,56 +77,26 @@ function extractFromTgz(tgzPath: string): { dir: string; cleanup: () => void } {
   }
   const dir = mkdtempSync(join(tmpdir(), 'mind-stdlib-'));
   try {
-    execFileSync('tar', ['xzf', tgzPath, '-C', dir, '--wildcards', 'pmind/file/*.src'], {
+    execFileSync('tar', ['xzf', tgzPath, '-C', dir, '--wildcards', FILE_GLOB, KERNEL_GLOB], {
       stdio: ['ignore', 'ignore', 'pipe'],
     });
   } catch {
     rmSync(dir, { recursive: true, force: true });
-    console.error(`配布物から pmind/file/*.src を取り出せませんでした: ${tgzPath}`);
+    console.error(`配布物から ${FILE_GLOB} / ${KERNEL_GLOB} を取り出せませんでした: ${tgzPath}`);
     process.exit(1);
   }
-  return { dir: join(dir, 'pmind', 'file'), cleanup: () => rmSync(dir, { recursive: true, force: true }) };
+  return { dir: join(dir, 'pmind'), cleanup: () => rmSync(dir, { recursive: true, force: true }) };
 }
 
-/** 行を分かち書きで区切る */
-function tokenize(line: string): string[] {
-  const tokens: string[] = [];
-  let cur = '';
-  for (const ch of line) {
-    if (isSeparator(ch)) {
-      if (cur) { tokens.push(cur); cur = ''; }
-    } else {
-      cur += ch;
-    }
-  }
-  if (cur) tokens.push(cur);
-  return tokens;
+/**
+ * カーネル単語表の種別は `アセンブラ定義の処理単語` という文字列そのものになる。
+ * 辞書の上ではただの処理単語として扱いたいので揃えておく。
+ */
+function canonicalKind(kind: string): string {
+  return kind.startsWith('アセンブラ定義') ? '処理単語' : kind;
 }
 
-/** `（… → …）` を取り出す。中点コメントと違い、矢印があるものだけをスタック仕様とみなす */
-function extractStackSpec(rest: string): string | null {
-  const m = rest.match(/[（(]([^）)]*)[）)]/);
-  if (!m || m[1] === undefined) return null;
-  const body = m[1];
-  if (!/→|->/.test(body)) return null;
-  return body.replace(/[\s　]+/g, ' ').trim();
-}
-
-function detectKind(rest: string): Kind {
-  for (const k of KINDS) {
-    if (rest.includes(k)) return k;
-  }
-  return '不明';
-}
-
-function extractAttrs(rest: string): string[] {
-  // 処理単語 / 関数 に続くスタック属性（.S .N .D NN SN など）
-  const m = rest.match(/(?:処理単語|関数)[\s　]+([.\w]+(?:[\s　]+[.\w]+)*)/);
-  if (!m || m[1] === undefined) return [];
-  return m[1].split(/[\s　]+/).filter((a) => /^[.A-Za-z0-9]+$/.test(a));
-}
-
-function parseFile(fileName: string, text: string): WordEntry[] {
+function parseFile(fileName: string, source: 'file' | 'kernel', text: string): WordEntry[] {
   const result = parse(text);
   const entries: WordEntry[] = [];
 
@@ -121,10 +104,11 @@ function parseFile(fileName: string, text: string): WordEntry[] {
     entries.push({
       name: d.name.raw,
       normalized: d.name.normalized,
-      kind: d.kind,
+      kind: canonicalKind(d.kind),
       stack: null,
       attrs: [],
       scope: d.visibility,
+      source,
       file: fileName,
       line: d.range.start.line + 1,
     });
@@ -134,10 +118,11 @@ function parseFile(fileName: string, text: string): WordEntry[] {
     entries.push({
       name: d.name.raw,
       normalized: d.name.normalized,
-      kind: d.kind,
+      kind: canonicalKind(d.kind),
       stack: d.stackSpec,
       attrs: [...d.attrs],
       scope: d.visibility,
+      source,
       file: fileName,
       line: d.range.start.line + 1,
     });
@@ -178,34 +163,68 @@ function mergeForwardDeclarations(entries: WordEntry[]): WordEntry[] {
   return out;
 }
 
+function listing(dir: string, ext: string): string[] {
+  if (!existsSync(dir)) return [];
+  return readdirSync(dir)
+    .filter((f) => f.endsWith(ext))
+    .sort();
+}
+
+/**
+ * カーネル単語表は c_words / c_words2 / c_wordsg の 3 つがあり、大半が同じ語である。
+ * 正規形が同じものは 1 つに畳む（代表は最初に現れたもの）。
+ */
+function dedupe(entries: WordEntry[]): WordEntry[] {
+  const seen = new Map<string, WordEntry>();
+  const out: WordEntry[] = [];
+  for (const e of entries) {
+    const key = `${e.scope}/${e.source}/${e.normalized}`;
+    const found = seen.get(key);
+    if (found === undefined) {
+      seen.set(key, e);
+      out.push(e);
+      continue;
+    }
+    if (found.stack === null && e.stack !== null) found.stack = e.stack;
+    if (found.attrs.length === 0 && e.attrs.length > 0) found.attrs = e.attrs;
+  }
+  return out;
+}
+
 function main(): void {
   const args = parseArgs(process.argv.slice(2));
-  let srcDir: string;
+  let root: string;
   let cleanup = () => {};
   let origin: string;
 
   if (args.dir) {
-    srcDir = resolve(args.dir);
-    origin = srcDir;
+    root = resolve(args.dir);
+    origin = root;
   } else {
     const tgz = resolve(args.tgz ?? DEFAULT_TGZ);
     const ex = extractFromTgz(tgz);
-    srcDir = ex.dir;
+    root = ex.dir;
     cleanup = ex.cleanup;
     origin = tgz;
   }
 
   try {
     const decoder = new TextDecoder('euc-jp');
-    const files = readdirSync(srcDir).filter((f) => f.endsWith('.src')).sort();
-    const raw: WordEntry[] = [];
+    const sources: { source: 'file' | 'kernel'; dir: string; files: string[] }[] = [
+      { source: 'file', dir: join(root, 'file'), files: listing(join(root, 'file'), '.src') },
+      { source: 'kernel', dir: join(root, 'kernel'), files: listing(join(root, 'kernel'), '.wrd') },
+    ];
 
-    for (const f of files) {
-      const text = decoder.decode(readFileSync(join(srcDir, f)));
-      raw.push(...parseFile(f, text));
+    const raw: WordEntry[] = [];
+    for (const group of sources) {
+      for (const f of group.files) {
+        const text = decoder.decode(readFileSync(join(group.dir, f)));
+        raw.push(...parseFile(f, group.source, text));
+      }
     }
 
-    const words = mergeForwardDeclarations(raw);
+    const words = dedupe(mergeForwardDeclarations(raw));
+    const fileCount = sources.reduce((n, g) => n + g.files.length, 0);
 
     const doc = {
       generatedBy: 'tools/gen-stdlib-dict.ts',
@@ -214,12 +233,14 @@ function main(): void {
         distribution: 'mind-for-linux-8.0.08',
         library: 'file',
         origin: origin.replace(/^.*\//, ''),
-        files: files.length,
+        files: fileCount,
       },
       counts: {
         total: words.length,
         global: words.filter((w) => w.scope === 'global').length,
         local: words.filter((w) => w.scope === 'local').length,
+        fromFile: words.filter((w) => w.source === 'file').length,
+        fromKernel: words.filter((w) => w.source === 'kernel').length,
       },
       words,
     };
@@ -227,8 +248,10 @@ function main(): void {
     mkdirSync(dirname(OUT), { recursive: true });
     writeFileSync(OUT, JSON.stringify(doc, null, 2) + '\n', 'utf8');
 
+    const files = { length: fileCount };
     console.log(`${files.length} ファイルから ${words.length} 語を抽出しました`);
     console.log(`  global ${doc.counts.global} / local ${doc.counts.local}`);
+    console.log(`  library ${doc.counts.fromFile} / kernel ${doc.counts.fromKernel}`);
     console.log(`  -> ${OUT}`);
   } finally {
     cleanup();

@@ -110,3 +110,39 @@ describe('位置情報', () => {
     expect(t.range.end).toEqual({ line: 1, character: 5 });
   });
 });
+
+describe('数式表現', () => {
+  const kinds = (src: string) => lex(src).tokens.map((t) => `${t.kind}:${t.raw}`);
+
+  it('角括弧は単語に密着していても切り出す', () => {
+    // マニュアル 6「数式表現」: 角括弧・丸括弧・句点だけは密着して書いてよい
+    expect(kinds('［六分のπ　：＝　ＰＩ　÷　６．０］を')).toEqual([
+      'operator:［',
+      'word:六分のπ',
+      'operator:：＝',
+      'word:ＰＩ',
+      'operator:÷',
+      'number:６．０',
+      'operator:］を',
+    ]);
+  });
+
+  it('半角でも同じように切り出す', () => {
+    expect(kinds('[単価 * 個数]が')).toEqual([
+      'operator:[',
+      'word:単価',
+      'operator:*',
+      'word:個数',
+      'operator:]が',
+    ]);
+  });
+
+  it('負数リテラルは演算子にしない', () => {
+    expect(kinds('-12.34を')).toEqual(['number:-12.34を']);
+  });
+
+  it('丸括弧の扱いは変えない（配列添字とコメント）', () => {
+    expect(kinds('配列（１）を')).toEqual(['word:配列（１）を']);
+    expect(kinds('（ コメント ）')).toEqual(['comment:（ コメント ）']);
+  });
+});

@@ -13,8 +13,10 @@ export interface StdlibWord {
   readonly stack: string | null;
   readonly attrs: readonly string[];
   readonly scope: 'global' | 'local';
+  /** `file` = 標準ライブラリのソース / `kernel` = カーネル組み込み単語表 */
+  readonly source: 'file' | 'kernel';
   readonly forwardDeclared?: boolean;
-  /** 出典。`coutput.src` など */
+  /** 出典のファイル名。`coutput.src` `c_words.wrd` など */
   readonly file: string;
   readonly line: number;
 }

@@ -66,3 +66,28 @@ describe('スコープ', () => {
     expect(resolve(t, '反応')?.kind).toBe('処理単語');
   });
 });
+
+describe('局所処理単語', () => {
+  const src = [
+    '処理１とは',
+    '\t作業は　変数',
+    '\t下位処理とは',
+    '\t\t作業を　表示し',
+    '\t本体とは',
+    '\t\t下位処理すること。',
+    '別の単語とは',
+    '\t下位処理すること。',
+  ].join('\n');
+
+  const table = buildSymbolTable(parse(src));
+
+  it('親のスコープに入り、外からは見えない', () => {
+    expect(table.globals.has('下位処理')).toBe(false);
+    expect(resolve(table, '下位処理', '処理1')?.kind).toBe('処理単語');
+    expect(resolve(table, '下位処理', '別単語')).toBeUndefined();
+  });
+
+  it('局所変数と同じスコープに並ぶ', () => {
+    expect([...table.locals.get('処理1')!.keys()]).toEqual(['作業', '下位処理']);
+  });
+});

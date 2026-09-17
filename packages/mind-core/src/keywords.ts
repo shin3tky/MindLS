@@ -73,6 +73,8 @@ export const DECLARATION_KEYWORDS = new Map<string, string>([
   [n('数値'), '数値'],
   [n('等価な関数'), '等価な関数'],
   [n('等価'), '等価'],
+  // カーネル単語表 c_words*.wrd の宣言形。`複写は　アセンブラ定義の処理単語。`
+  [n('アセンブラ定義の処理単語'), '処理単語'],
 ]);
 
 /** 定義に使われる語（正規形 → 種別） */
@@ -81,6 +83,28 @@ export const DEFINITION_KEYWORDS = new Map<string, string>([
   [n('関数'), '関数'],
   [n('仮定義'), '仮定義'],
   [n('本定義'), '本定義'],
+  // 型紙は処理単語ではないが、`○○は　型紙` … `。` という
+  // 本体を持つブロックなので、定義と同じ扱いにしておく
+  [n('型紙'), '型紙'],
+]);
+
+/** 型紙ブロックの中の `△△は` は、その型の要素（大域に見える） */
+export const TEMPLATE_KIND = '型紙';
+export const TEMPLATE_MEMBER_KIND = '型紙要素';
+
+/**
+ * `○○とは　処理単語　整数入力　整数出力` のように種別のうしろに並ぶ属性語（正規形）。
+ * マニュアル 02-Program-Hyoki「処理単語の属性を指定する」。
+ * 配布物のライブラリでは `.N` `SQ` `NN` のような短い記号形も使われる。
+ */
+export const ATTRIBUTE_WORDS: ReadonlySet<string> = new Set([
+  n('整数入力'),
+  n('小数入力'),
+  n('整数出力'),
+  n('小数出力'),
+  n('実数入力'),
+  n('実数出力'),
+  n('逆転抑制'),
 ]);
 
 export const VISIBILITY_LOCAL = n('ローカル');

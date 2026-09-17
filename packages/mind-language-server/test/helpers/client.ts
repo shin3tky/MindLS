@@ -90,11 +90,19 @@ export class LspClient {
     }
   }
 
-  async initialize(): Promise<unknown> {
+  /** たまっている通知を捨てる（didOpen では publishDiagnostics が複数回来る） */
+  drainNotifications(method: string): void {
+    for (let i = this.notifications.length - 1; i >= 0; i--) {
+      if (this.notifications[i]!.method === method) this.notifications.splice(i, 1);
+    }
+  }
+
+  async initialize(initializationOptions?: unknown): Promise<unknown> {
     const result = await this.request('initialize', {
       processId: process.pid,
       rootUri: null,
       capabilities: {},
+      initializationOptions,
     });
     this.notify('initialized', {});
     return result;

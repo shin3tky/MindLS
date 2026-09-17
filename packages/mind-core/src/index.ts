@@ -25,7 +25,23 @@ export type {
 } from './parser.ts';
 export { buildSymbolTable, resolve, visibleSymbols } from './symbols.ts';
 export type { SymbolEntry, SymbolTable } from './symbols.ts';
-export { BLOCK_SPECS, blockRoleOf, DECLARATION_KEYWORDS, DEFINITION_KEYWORDS } from './keywords.ts';
+export {
+  ATTRIBUTE_WORDS,
+  BLOCK_SPECS,
+  blockRoleOf,
+  DECLARATION_KEYWORDS,
+  DEFINITION_KEYWORDS,
+  TEMPLATE_KIND,
+  TEMPLATE_MEMBER_KIND,
+} from './keywords.ts';
+export { analyze } from './diagnostics.ts';
+export type {
+  AnalysisDiagnostic,
+  AnalysisDiagnosticCode,
+  AnalyzeOptions,
+} from './diagnostics.ts';
+export { isReserved, RESERVED_BY_NORMALIZED, RESERVED_WORDS } from './reserved.ts';
+export type { ReservedKind, ReservedWord } from './reserved.ts';
 export {
   comparePosition,
   containsPosition,

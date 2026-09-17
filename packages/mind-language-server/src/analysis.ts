@@ -22,6 +22,7 @@ import type { TextDocument } from 'vscode-languageserver-textdocument';
 import { createRequire } from 'node:module';
 
 import {
+  analyze as analyzeSemantics,
   buildSymbolTable,
   createStdlibIndex,
   documentSymbols,
@@ -29,6 +30,7 @@ import {
   parse,
 } from '@mindls/core';
 import type {
+  AnalyzeOptions,
   CompletionItem as CoreCompletionItem,
   DocumentSymbolNode,
   HoverInfo,
@@ -82,7 +84,11 @@ const SEVERITY = {
   hint: DiagnosticSeverity.Hint,
 } as const;
 
-export function toDiagnostics(parsed: ParseResult): Diagnostic[] {
+export function toDiagnostics(
+  parsed: ParseResult,
+  symbols?: SymbolTable,
+  options: AnalyzeOptions = {},
+): Diagnostic[] {
   const out: Diagnostic[] = parsed.diagnostics.map((d) => ({
     range: toLspRange(d.range),
     severity: SEVERITY[d.severity],
@@ -90,6 +96,19 @@ export function toDiagnostics(parsed: ParseResult): Diagnostic[] {
     code: d.code,
     message: d.message,
   }));
+
+  // シンボルを見ないと分からない診断（未定義単語・前方参照など）
+  if (symbols !== undefined) {
+    for (const d of analyzeSemantics(parsed, symbols, options)) {
+      out.push({
+        range: toLspRange(d.range),
+        severity: SEVERITY[d.severity],
+        source: 'mind',
+        code: d.code,
+        message: d.message,
+      });
+    }
+  }
 
   // `終り。` 以降はコンパイルされない。灰色表示のためのヒントを出す
   if (parsed.endOfCompilation !== null) {
