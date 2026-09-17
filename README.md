@@ -10,7 +10,7 @@ Language Server と VS Code 拡張。
 
 | パッケージ | 役割 |
 |---|---|
-| `@mindls/core` | 正規化・レキサ・パーサ・シンボルテーブル・診断。エディタ非依存 |
+| `@mindls/core` | 正規化・レキサ・パーサ・シンボルテーブル・診断・リネーム・Semantic Tokens。エディタ非依存 |
 | `@mindls/compiler` | 実 Mind コンパイラを叩くアダプタ（オプトイン・未実装） |
 | `@mindls/language-server` | LSP 本体（stdio） |
 | `vscode-mind` | VS Code 拡張 |
@@ -22,6 +22,8 @@ npm install
 npm run build     # 全パッケージを dist/ へ
 npm test          # Vitest
 npm run typecheck
+npm run bundle    # 配布用に esbuild で束ねる
+npm run package   # .vsix を作る
 ```
 
 必要なのは **Node.js 22 以上**と **VS Code 1.90 以上**だけです。
@@ -60,6 +62,7 @@ code --extensionDevelopmentPath="$PWD/packages/vscode-mind" examples
 | 見るもの | 操作 | 期待 |
 |---|---|---|
 | ハイライト | そのまま眺める | `※` コメントが灰色、`「…」` が文字列色、`ならば` `つぎに` `繰り返す` がキーワード色 |
+| 塗り分け | `一行表示` と `売り上げ計上` を見比べる | 標準ライブラリの単語と、自分で定義した単語が別の色になる（Semantic Tokens） |
 | アウトライン | エクスプローラーの「アウトライン」 | `売り上げ計上` `明細を表示` `メイン` が並び、`明細を表示` を開くと局所変数 `＿見出し` と**局所処理単語** `一行分を表示` が子に出る |
 | ホバー | `売り上げ計上` の上にカーソル | 種別・スタック仕様 `（金額 → ・）`・属性 `整数入力` が出る |
 | ホバー（標準単語） | `一行表示` の上にカーソル | 辞書から `（文字列 → ・）` と出典ファイル名が出る |
@@ -67,6 +70,9 @@ code --extensionDevelopmentPath="$PWD/packages/vscode-mind" examples
 | 参照検索 | 同じ場所で **Shift+F12** | 引用箇所が列挙される |
 | 補完 | 新しい行で `表` と打つ | `表示` `一行表示` `数値表示` … が候補に出る。いまいる定義の局所変数が最上位に来る |
 | スニペット補完 | `事例` と打って確定 | `事例をとる` … `例外なら` … `事例終り` まで入る |
+| リネーム | `売り上げ計上し` で **F2** → `記帳` | `記帳とは` `記帳し` `記帳する。` と、送り仮名と助詞を残したまま全部書き変わる |
+| リネームの拒否 | `一行表示` で **F2** | 「このファイルで定義されていません」と理由が出る |
+| 字下げ | `ならば` だけの行で **Enter**、次の行で `つぎに` と打つ | 深くなり、`つぎに` で戻る |
 | 診断 | `examples/diagnostics.src` を開く | 警告が 3 つ（下記） |
 
 `examples/diagnostics.src` はわざと引っかけてあります。
@@ -148,7 +154,26 @@ node packages/mind-language-server/dist/cli.js --stdio
 テストはこれを**実プロセスとして起動**して JSON-RPC を話します
 （`packages/mind-language-server/test/helpers/client.ts`）。配線の間違いはここで落ちます。
 
-### 6. 文字コードについて
+### 6. .vsix を作る
+
+配布用のパッケージは 2 手でできます。
+
+```sh
+npm run bundle     # esbuild で拡張と Language Server を 1 ファイルずつに束ねる
+npm run package    # vsce package → dist/vscode-mind-0.0.1.vsix
+```
+
+npm workspaces では `@mindls/language-server` が node_modules のシンボリックリンクになっていて、
+vsce はこれを .vsix に入れられません。そこで **esbuild で束ねてから包みます**。
+辞書はバンドルに含めず `stdlib.json` として隣に置き、Language Server が
+リンク → 隣のファイルの順で探します。
+
+できた .vsix は VS Code の拡張ビューの `…` → 「VSIX からのインストール」で入れられます。
+
+> Marketplace に出すときは `packages/vscode-mind/package.json` の `publisher` を
+> 自分のパブリッシャー ID に直してください（いまは `shin3tky` を仮に入れてあります）。
+
+### 7. 文字コードについて
 
 本物の Mind のソースは **EUC-JP**（Linux 版）または **Shift_JIS**（Windows 版）です。
 VS Code の既定は UTF-8 なので、そのまま開くと日本語が化けます。
@@ -179,6 +204,15 @@ Language Server は VS Code から UTF-8 のテキストを受け取るので、
 | `mind.compiler.enabled` | `false` | 保存時に実 Mind コンパイラで検査する（Docker が要る・未実装） |
 | `mind.compiler.docker.image` | `mind-docker:8.0.08` | 実コンパイラ連携に使うイメージ |
 | `mind.trace.server` | `off` | LSP のやりとりを出力パネルに記録する |
+
+## アイコン
+
+`packages/vscode-mind/icon.png` は `tools/gen-icon.py` が唯一の出どころです
+（Marketplace のアイコンは PNG しか受け付けないため）。直すときはスクリプトを直して
+
+```sh
+python3 tools/gen-icon.py
+```
 
 ## 標準単語辞書
 

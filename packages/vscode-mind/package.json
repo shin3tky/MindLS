@@ -3,6 +3,23 @@
   "displayName": "Mind (日本語プログラミング言語)",
   "description": "日本語プログラミング言語 Mind の構文ハイライトと Language Server",
   "version": "0.0.1",
+  "publisher": "shin3tky",
+  "icon": "icon.png",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/shin3tky/MindLS.git"
+  },
+  "bugs": {
+    "url": "https://github.com/shin3tky/MindLS/issues"
+  },
+  "homepage": "https://github.com/shin3tky/MindLS#readme",
+  "keywords": [
+    "mind",
+    "日本語プログラミング言語",
+    "japanese",
+    "language server",
+    "lsp"
+  ],
   "private": true,
   "license": "Apache-2.0",
   "engines": {
@@ -11,9 +28,16 @@
   "categories": [
     "Programming Languages"
   ],
+  "galleryBanner": {
+    "color": "#1A1F2E",
+    "theme": "dark"
+  },
   "main": "./dist/extension.js",
   "scripts": {
-    "build": "tsc --build"
+    "build": "tsc --build",
+    "bundle": "node ../../tools/bundle.mts",
+    "vscode:prepublish": "node ../../tools/bundle.mts",
+    "package": "vsce package --no-dependencies --out ../../dist/"
   },
   "contributes": {
     "languages": [
@@ -97,6 +121,57 @@
           "default": "off",
           "description": "Language Server とのやりとりを出力パネル「Mind Language Server」に記録する。拡張の開発時だけ使う。"
         }
+      }
+    },
+    "semanticTokenScopes": [
+      {
+        "language": "mind",
+        "scopes": {
+          "function.defaultLibrary": [
+            "support.function.mind"
+          ],
+          "function.definition": [
+            "entity.name.function.mind"
+          ],
+          "function.static": [
+            "entity.name.function.mind"
+          ],
+          "function": [
+            "entity.name.function.mind"
+          ],
+          "variable.declaration": [
+            "variable.other.mind"
+          ],
+          "variable.readonly": [
+            "variable.other.constant.mind"
+          ],
+          "variable": [
+            "variable.other.mind"
+          ],
+          "property": [
+            "variable.other.property.mind"
+          ],
+          "type": [
+            "entity.name.type.mind"
+          ],
+          "type.defaultLibrary": [
+            "support.type.mind"
+          ],
+          "macro": [
+            "keyword.control.directive.mind"
+          ],
+          "keyword": [
+            "keyword.control.mind"
+          ],
+          "operator": [
+            "keyword.operator.mind"
+          ]
+        }
+      }
+    ],
+    "configurationDefaults": {
+      "[mind]": {
+        "editor.semanticHighlighting.enabled": true
       }
     }
   },

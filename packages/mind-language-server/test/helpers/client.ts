@@ -25,8 +25,9 @@ export class LspClient {
   private buffer = Buffer.alloc(0);
   private nextId = 1;
 
-  constructor() {
-    this.child = spawn(process.execPath, [SERVER, '--stdio'], { stdio: 'pipe' });
+  /** @param server 起動する実体。既定は開発中の dist/cli.js（バンドルの検証では差し替える） */
+  constructor(server: string = SERVER) {
+    this.child = spawn(process.execPath, [server, '--stdio'], { stdio: 'pipe' });
     this.child.stdout.on('data', (chunk: Buffer) => { this.onData(chunk); });
     this.child.stderr.on('data', () => { /* サーバのログは無視 */ });
   }

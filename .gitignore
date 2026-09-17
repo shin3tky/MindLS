@@ -1,5 +1,6 @@
 # Node / TypeScript
 node_modules/
+# tsc の出力と、vsce が置く .vsix
 dist/
 out/
 *.tsbuildinfo

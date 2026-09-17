@@ -41,6 +41,20 @@ export type {
   AnalyzeOptions,
 } from './diagnostics.ts';
 export { isReserved, RESERVED_BY_NORMALIZED, RESERVED_WORDS } from './reserved.ts';
+export { prepareRename, renameEdits, splitOkurigana, validateName } from './rename.ts';
+export type { RenameEdit, RenameError, RenameOptions, RenameTarget } from './rename.ts';
+export {
+  encodeSemanticTokens,
+  semanticTokens,
+  TOKEN_MODIFIERS,
+  TOKEN_TYPES,
+} from './semantic.ts';
+export type {
+  SemanticContext,
+  SemanticToken,
+  SemanticTokenModifier,
+  SemanticTokenType,
+} from './semantic.ts';
 export type { ReservedKind, ReservedWord } from './reserved.ts';
 export {
   comparePosition,

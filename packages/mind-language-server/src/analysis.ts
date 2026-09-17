@@ -19,7 +19,9 @@ import {
 } from 'vscode-languageserver/node';
 import type { TextDocument } from 'vscode-languageserver-textdocument';
 
+import { readFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
+import { fileURLToPath } from 'node:url';
 
 import {
   analyze as analyzeSemantics,
@@ -177,14 +179,39 @@ export function toDocumentSymbols(parsed: ParseResult): DocumentSymbol[] {
  * 標準単語辞書を読み込む。配布物から生成してコミットしてあるものなので、
  * Mind の配布物も Docker も要らない。
  */
-function loadStdlib(): StdlibIndex {
+/**
+ * 標準単語辞書の置き場所の候補。
+ *
+ * 開発中は npm workspaces のリンク越しに `@mindls/core/stdlib` が引ける。
+ * 配布する .vsix では esbuild が 1 ファイルに束ねてしまうのでリンクは無く、
+ * かわりに `stdlib.json` をバンドルの隣に置いてある。両方を順に試す。
+ */
+function stdlibCandidates(): string[] {
+  const out: string[] = [];
+  const override = process.env['MINDLS_STDLIB'];
+  if (override !== undefined && override !== '') out.push(override);
   try {
-    const require = createRequire(import.meta.url);
-    const doc = require('@mindls/core/stdlib') as StdlibDocument;
-    return createStdlibIndex(doc);
+    out.push(fileURLToPath(new URL('stdlib.json', import.meta.url)));
   } catch {
-    return EMPTY_STDLIB;
+    /* バンドルされていない場合は次を試す */
   }
+  try {
+    out.push(createRequire(import.meta.url).resolve('@mindls/core/stdlib'));
+  } catch {
+    /* リンクが無い場合は次を試す */
+  }
+  return out;
+}
+
+function loadStdlib(): StdlibIndex {
+  for (const path of stdlibCandidates()) {
+    try {
+      return createStdlibIndex(JSON.parse(readFileSync(path, 'utf8')) as StdlibDocument);
+    } catch {
+      continue;
+    }
+  }
+  return EMPTY_STDLIB;
 }
 
 let stdlibCache: StdlibIndex | undefined;

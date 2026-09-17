@@ -1,0 +1,16 @@
+# .vsix に入れないもの。
+# 拡張と Language Server は esbuild で dist/ に束ねてあるので、
+# ソースも node_modules も要らない（vsce は --no-dependencies で呼ぶ）。
+
+src/**
+test/**
+tsconfig.json
+tsconfig.tsbuildinfo
+.vscodeignore
+
+# バンドルのソースマップは配布しない（`npm run bundle -- --dev` のときだけ出る）
+dist/**/*.map
+
+# 型定義はエディタには要らない
+dist/**/*.d.ts
+dist/**/*.d.ts.map

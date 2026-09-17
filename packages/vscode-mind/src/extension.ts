@@ -5,6 +5,7 @@
  * 解析そのものは @mindls/core、LSP の受け口は @mindls/language-server が持つ。
  */
 
+import * as fs from 'node:fs';
 import * as path from 'node:path';
 
 import * as vscode from 'vscode';
@@ -17,15 +18,22 @@ import {
 
 let client: LanguageClient | undefined;
 
-/** Language Server の実体を探す。開発中はワークスペース内の隣のパッケージを見る。 */
+/**
+ * Language Server の実体を探す。
+ *
+ * 開発中は npm workspaces のリンク越しに `@mindls/language-server` が引ける。
+ * 配布する .vsix にはリンクが無いかわりに、束ねた `dist/server.js` が同梱してある。
+ * リンクを先に見るのは、開発中に古いバンドルを掴まないため。
+ */
 function resolveServerModule(context: vscode.ExtensionContext): string {
   try {
     return require.resolve('@mindls/language-server/dist/cli.js');
   } catch {
-    return context.asAbsolutePath(
-      path.join('..', 'mind-language-server', 'dist', 'cli.js'),
-    );
+    /* 配布物では解決できない。同梱のバンドルを使う */
   }
+  const bundled = context.asAbsolutePath(path.join('dist', 'server.js'));
+  if (fs.existsSync(bundled)) return bundled;
+  return context.asAbsolutePath(path.join('..', 'mind-language-server', 'dist', 'cli.js'));
 }
 
 async function startLanguageServer(context: vscode.ExtensionContext): Promise<void> {

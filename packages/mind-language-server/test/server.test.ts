@@ -253,3 +253,85 @@ describe('診断の配線（実プロセス）', () => {
     await client.dispose();
   }, 20_000);
 });
+
+describe('Semantic Tokens（実プロセス）', () => {
+  it('凡例を宣言し、5 個 1 組のデータを返す', async () => {
+    const client = new LspClient();
+    const result = (await client.initialize()) as {
+      capabilities: { semanticTokensProvider?: { legend: { tokenTypes: string[] } } };
+    };
+    const legend = result.capabilities.semanticTokensProvider?.legend;
+    expect(legend?.tokenTypes).toContain('function');
+
+    const uri = 'file:///tmp/semantic.src';
+    client.openDocument(uri, '売り上げは　変数。\nメインとは\n　売り上げを　一行表示すること。');
+    const tokens = await client.request<{ data: number[] }>('textDocument/semanticTokens/full', {
+      textDocument: { uri },
+    });
+    expect(tokens.data.length % 5).toBe(0);
+    expect(tokens.data.length).toBeGreaterThan(0);
+
+    // 3 番目の要素は長さ。`売り上げ` は 4 文字
+    expect(tokens.data[2]).toBe(4);
+    // 標準単語 `一行表示` には defaultLibrary が立つ
+    const library = legend!.tokenTypes.indexOf('function');
+    const groups: number[][] = [];
+    for (let i = 0; i < tokens.data.length; i += 5) groups.push(tokens.data.slice(i, i + 5));
+    expect(groups.some((g) => g[3] === library && g[4] !== 0)).toBe(true);
+
+    await client.dispose();
+  }, 20_000);
+});
+
+describe('リネーム（実プロセス）', () => {
+  const SOURCE_R = [
+    '売り上げ計上とは　（金額　→　・）',
+    '　増加すること。',
+    'メインとは',
+    '　１２０円を　売り上げ計上し',
+    '　２５０円を　売り上げ計上する。',
+  ].join('\n');
+  const RENAME_URI = 'file:///tmp/rename.src';
+
+  const open = async () => {
+    const c = new LspClient();
+    await c.initialize();
+    c.openDocument(RENAME_URI, SOURCE_R);
+    return c;
+  };
+
+  it('prepareRename が助詞を除いた範囲を返す', async () => {
+    const c = await open();
+    const result = await c.request<{ range: unknown; placeholder: string }>(
+      'textDocument/prepareRename',
+      { textDocument: { uri: RENAME_URI }, position: { line: 3, character: 8 } },
+    );
+    expect(result.placeholder).toBe('売り上げ計上し');
+    await c.dispose();
+  }, 20_000);
+
+  it('全出現を送り仮名ごと書き換える', async () => {
+    const c = await open();
+    const edit = await c.request<{ changes: Record<string, Array<{ newText: string }>> }>(
+      'textDocument/rename',
+      { textDocument: { uri: RENAME_URI }, position: { line: 3, character: 8 }, newName: '記帳' },
+    );
+    expect(edit.changes[RENAME_URI]!.map((e) => e.newText).sort()).toEqual([
+      '記帳',
+      '記帳し',
+      '記帳する',
+    ]);
+    await c.dispose();
+  }, 20_000);
+
+  it('標準単語のリネームは理由を付けて断る', async () => {
+    const c = await open();
+    await expect(
+      c.request('textDocument/prepareRename', {
+        textDocument: { uri: RENAME_URI },
+        position: { line: 1, character: 2 },
+      }),
+    ).rejects.toThrow(/予約語|定義されていません/);
+    await c.dispose();
+  }, 20_000);
+});

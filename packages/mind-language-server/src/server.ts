@@ -9,16 +9,30 @@ import {
   createConnection,
   DidChangeConfigurationNotification,
   ProposedFeatures,
+  ResponseError,
   TextDocumentSyncKind,
   TextDocuments,
   type Connection,
   type InitializeResult,
   type Location,
   type SymbolInformation,
+  type WorkspaceEdit,
 } from 'vscode-languageserver/node';
 import { TextDocument } from 'vscode-languageserver-textdocument';
 
-import { completionsAt, findDefinition, findReferences, hoverAt, searchSymbols } from '@mindls/core';
+import {
+  completionsAt,
+  encodeSemanticTokens,
+  findDefinition,
+  findReferences,
+  hoverAt,
+  prepareRename,
+  renameEdits,
+  searchSymbols,
+  semanticTokens,
+  TOKEN_MODIFIERS,
+  TOKEN_TYPES,
+} from '@mindls/core';
 
 import {
   analyze,
@@ -64,6 +78,9 @@ function readDiagnosticSettings(raw: unknown): DiagnosticSettings {
   return out;
 }
 
+/** リネームを断ったときに返すコード。LSP の予約範囲外を使う */
+const RENAME_REFUSED = -32_803;
+
 export function startServer(connection: Connection = createConnection(ProposedFeatures.all)): void {
   const documents = new TextDocuments(TextDocument);
   let diagnosticSettings = DEFAULT_DIAGNOSTICS;
@@ -80,6 +97,11 @@ export function startServer(connection: Connection = createConnection(ProposedFe
         completionProvider: { resolveProvider: false, triggerCharacters: [] },
         referencesProvider: true,
         workspaceSymbolProvider: true,
+        renameProvider: { prepareProvider: true },
+        semanticTokensProvider: {
+          legend: { tokenTypes: [...TOKEN_TYPES], tokenModifiers: [...TOKEN_MODIFIERS] },
+          full: true,
+        },
       },
       serverInfo: { name: 'mind-language-server' },
     };
@@ -167,6 +189,37 @@ export function startServer(connection: Connection = createConnection(ProposedFe
       position,
     });
     return info === null ? null : toHover(info);
+  });
+
+  connection.onPrepareRename(({ textDocument, position }) => {
+    const doc = documents.get(textDocument.uri);
+    if (doc === undefined) return null;
+    const { parsed, symbols } = analyze(doc);
+    const target = prepareRename(parsed, symbols, position);
+    // エラーを返すと、VS Code がその文言をそのまま出してくれる
+    if ('code' in target) return new ResponseError(RENAME_REFUSED, target.message);
+    return { range: toLspRange(target.range), placeholder: target.text };
+  });
+
+  connection.onRenameRequest(({ textDocument, position, newName }) => {
+    const doc = documents.get(textDocument.uri);
+    if (doc === undefined) return null;
+    const { parsed, symbols } = analyze(doc);
+    const result = renameEdits(parsed, symbols, position, newName);
+    if (!Array.isArray(result)) return new ResponseError(RENAME_REFUSED, result.message);
+    const edit: WorkspaceEdit = {
+      changes: {
+        [doc.uri]: result.map((e) => ({ range: toLspRange(e.range), newText: e.newText })),
+      },
+    };
+    return edit;
+  });
+
+  connection.languages.semanticTokens.on(({ textDocument }) => {
+    const doc = documents.get(textDocument.uri);
+    if (doc === undefined) return { data: [] };
+    const { parsed, symbols } = analyze(doc);
+    return { data: encodeSemanticTokens(semanticTokens({ parsed, symbols, stdlib: stdlib() })) };
   });
 
   connection.onWorkspaceSymbol(({ query }): SymbolInformation[] => {
