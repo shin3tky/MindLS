@@ -34,8 +34,26 @@ export type LexDiagnosticCode =
   | 'string-too-long'
   | 'comment-paren-needs-space';
 
-/** 文字列定数の上限（`続` で継続しない場合） */
-const MAX_STRING_LENGTH = 158;
+/**
+ * 文字列定数の上限。マニュアル 02「文字列定数」に
+ * 「文字列定数の長さは最大32767 文字（半角換算）までである」とある。
+ *
+ * 末尾の `続` は長さの制限ではなく、**1 行に収まらないときの行継続**。
+ * （以前ここを 158 文字としていたが根拠が無く、実コンパイラは 170 文字の
+ *   全角文字列を問題なく通した。`fixtures/inf-corpus/b2-long-string.src`）
+ */
+const MAX_STRING_HALFWIDTH = 32_767;
+
+/** 半角換算の長さ。全角は 2、半角は 1 と数える */
+function halfWidthLength(text: string): number {
+  let n = 0;
+  for (const ch of text) {
+    const c = ch.codePointAt(0) ?? 0;
+    // ASCII と半角カナは 1、それ以外は 2
+    n += c < 0x80 || (c >= 0xff61 && c <= 0xff9f) ? 1 : 2;
+  }
+  return n;
+}
 
 const LINE_COMMENT = '※';
 const SUPPRESS_BEGIN = 'コンパイル抑止。';
@@ -352,10 +370,10 @@ function readString(
     cur.advance();
     if (c === close) {
       const raw = parts.join('');
-      // 開閉の文字数を除いた中身の長さ
-      if (raw.length - 2 > MAX_STRING_LENGTH) {
+      // 開閉の記号を除いた中身の長さ（半角換算）
+      if (halfWidthLength(raw.slice(1, -1)) > MAX_STRING_HALFWIDTH) {
         diagnostics.push({
-          message: `文字列定数が ${String(MAX_STRING_LENGTH)} 文字を超えています（行を継続するには末尾に \`続\` を置きます）`,
+          message: `文字列定数が ${String(MAX_STRING_HALFWIDTH)} 文字（半角換算）を超えています`,
           range: { start, end: cur.position() },
           severity: 'warning',
           code: 'string-too-long',

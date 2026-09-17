@@ -14,6 +14,9 @@ coverage/
 *.his
 *.inf
 
+# ただし .inf の実物はコーパスとしてコミットする（@mindls/compiler の根拠）
+!fixtures/inf-corpus/collected/**/*.inf
+
 # Mind の配布物（再配布しない。Mind-Docker 側で管理する）
 vendor/*.tgz
 
@@ -24,3 +27,6 @@ vendor/*.tgz
 
 # 公式サンプルの展開先（再配布しない。tools/extract-samples.ts で作る）
 fixtures/mind-samples/
+
+# 手元の確認用スクリプト
+fixtures/inf-corpus/_*.mts

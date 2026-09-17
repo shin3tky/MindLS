@@ -4,9 +4,17 @@ import { fileURLToPath } from 'node:url';
 
 import { describe, expect, it } from 'vitest';
 
+import { createRequire } from 'node:module';
+
 import { analyze } from '../src/diagnostics.ts';
 import { parse } from '../src/parser.ts';
+import { createStdlibIndex } from '../src/stdlib.ts';
+import type { StdlibDocument } from '../src/stdlib.ts';
 import { buildSymbolTable } from '../src/symbols.ts';
+
+const stdlibIndex = createStdlibIndex(
+  createRequire(import.meta.url)('../data/stdlib.json') as StdlibDocument,
+);
 
 /**
  * 実物のコーパスに対する検証。
@@ -75,7 +83,7 @@ describe.skipIf(samples.length === 0 && stdlib.length === 0)('既定の診断は
 
   it.each(all)('%s', (_name, path) => {
     const r = parse(readFileSync(path, 'utf8'));
-    const found = analyze(r, buildSymbolTable(r)).map(
+    const found = analyze(r, buildSymbolTable(r), { stdlib: stdlibIndex }).map(
       (d) => `L${String(d.range.start.line + 1)} [${d.code}] ${d.message}`,
     );
     expect(found).toEqual([]);

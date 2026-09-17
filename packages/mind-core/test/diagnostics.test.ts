@@ -143,3 +143,42 @@ describe('（ ）コメントの空白', () => {
     expect(codes('メインとは\n　（ 単価　→　金額 ）　表示すること。')).toEqual([]);
   });
 });
+
+describe('実コンパイラに合わせた振る舞い', () => {
+  // 以下はすべて fixtures/inf-corpus/ の見本で実物を確かめてある。
+
+  it('文字列の上限は 32767 文字（半角換算）。170 文字の全角は通る', () => {
+    const long = 'あ'.repeat(170);
+    expect(codes(`メインとは\n　「${long}」を　一行表示すること。`)).toEqual([]);
+  });
+
+  it('処理単語に密着した括弧を拾う（空白が無いとコメントにならない）', () => {
+    const src = 'メインとは\n　「あ」を　表示（ここはコメントのつもり）し\n　改行すること。';
+    expect(codes(src, { stdlib })).toEqual(['comment-paren-needs-space']);
+  });
+
+  it('関数の呼び出し表記は拾わない', () => {
+    // マニュアル 6「初等関数」: 関数は func(X) と書ける
+    const src = '二乗とは　関数　小数入力　小数出力\n　複写し　ｆ掛けること。\nメインとは\n　二乗(2.1)を　捨てること。';
+    expect(codes(src, { stdlib })).toEqual([]);
+  });
+
+  it('配列の添字は拾わない', () => {
+    const src = '棚は　文字列定数配列\n　"あ",\n　"い"。\nメインとは\n　位置は　変数\n　棚（位置）を　表示すること。';
+    expect(codes(src, { stdlib })).toEqual([]);
+  });
+});
+
+describe('壊れた括弧の巻き添え', () => {
+  it('コメントが成立していない行で、破片を未定義単語にしない', () => {
+    // `合計（単価　→　金額）し` は `合計（単価` `→` `金額）し` に割れる。
+    // 割れたことを 1 回言えば足りる。破片ごとに「未定義です」と重ねない
+    // このテストの辞書には `表示` しか入れていないので、それだけで書く
+    const src = 'メインとは\n　合計（単価　→　金額）し\n　表示すること。\n合計とは\n　表示すること。';
+    expect(codes(src, { stdlib, undefinedWords: true })).toEqual(['comment-paren-needs-space']);
+  });
+
+  it('記号だけの語は単語として数えない', () => {
+    expect(codes('メインとは\n　［１　＋　２］を　表示すること。', { stdlib, undefinedWords: true })).toEqual([]);
+  });
+});

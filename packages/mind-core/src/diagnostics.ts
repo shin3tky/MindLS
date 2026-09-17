@@ -10,7 +10,7 @@
  */
 
 import { ATTRIBUTE_WORDS, blockRoleOf, DECLARATION_KEYWORDS, DEFINITION_KEYWORDS } from './keywords.ts';
-import { isNegativeForm, PARTICLES } from './normalizer.ts';
+import { isNegativeForm, normalize, PARTICLES } from './normalizer.ts';
 import type { ParseResult } from './parser.ts';
 import { isReserved } from './reserved.ts';
 import type { StdlibIndex } from './stdlib.ts';
@@ -84,8 +84,11 @@ function isReference(t: Token, headers: ReadonlySet<number>): boolean {
   if (headers.has(t.range.start.line)) return false;
   if (blockRoleOf(t.normalized, t.raw) !== null) return false;
   if (SYNTAX_WORDS.has(t.normalized)) return false;
-  // `配列（１）` `pow(5.0` のように括弧が密着した語はまだ解決できない
-  if (/[（(]/.test(t.raw)) return false;
+  // 括弧が密着した語は解決できない。添字（`配列（１）`）、関数呼び出し（`pow(5.0`）、
+  // それに空白不足で壊れたコメントの破片（`金額）し`）も含めて、開き閉じ両方を見る
+  if (/[（()）]/.test(t.raw)) return false;
+  // 記号だけの語は単語ではない（`→` `≧` など、壊れたコメントの中身が残ったもの）
+  if (!/[ぁ-ゖァ-ヺ一-龯a-zA-Z0-9ａ-ｚＡ-Ｚ０-９]/.test(t.normalized)) return false;
   return true;
 }
 
@@ -116,10 +119,10 @@ export function analyze(
     if (end !== null && comparePosition(t.range.start, end) >= 0) break;
 
     if (options.commentParens !== false && t.kind === 'word') {
-      const paren = looksLikeIntendedComment(t.raw);
+      const paren = looksLikeIntendedComment(t.raw) ?? parenOnAction(t.raw, table, options.stdlib);
       if (paren !== null) {
         out.push({
-          message: `\`${paren}\` はコメントになりません。\`（\` の前と \`）\` の後ろに空白を置いてください（今は単語の一部です）`,
+          message: `\`${paren}\` はコメントになりません。\`（\` の前と \`）\` の後ろに空白を置いてください（Mind は「かっこ表記に誤りが有ります」とエラーにします）`,
           range: t.range,
           severity: 'warning',
           code: 'comment-paren-needs-space',
@@ -198,4 +201,34 @@ function looksLikeIntendedComment(raw: string): string | null {
   const head = raw.slice(0, Math.max(raw.indexOf('（'), raw.indexOf('(')) + 1);
   if (/^[\w.]*[（(]$/.test(head)) return null;
   return raw;
+}
+
+/**
+ * 処理単語のうしろに括弧が密着している形。
+ *
+ *   「あ」を　表示（ここはコメントのつもり）し
+ *
+ * 括弧の中に空白が無いので単語は切れず、`looksLikeIntendedComment` では拾えない。
+ * それでも実コンパイラは「かっこ表記に誤りが有ります」とエラーにする
+ * （`fixtures/inf-corpus/b2-paren-comment.src`）。
+ *
+ * 添字や関数呼び出しと見分けるため、次をすべて満たすときだけ拾う。
+ *   ・括弧の前が **処理単語** として解決する。関数は `小数関数(2.1)` という
+ *     呼び出し表記が正しい（マニュアル 6「初等関数」）ので対象外
+ *   ・括弧の中に仮名か漢字がある（`pow(5.0)` のような数値の並びは対象外）
+ */
+function parenOnAction(
+  raw: string,
+  table: SymbolTable,
+  stdlib: StdlibIndex | undefined,
+): string | null {
+  const m = /^(?<stem>[^（(]+)[（(](?<body>[^）)]*)[）)]/.exec(raw);
+  if (m?.groups === undefined) return null;
+  const body = m.groups['body']!;
+  if (!/[ぁ-ゖァ-ヺ一-龯]/.test(body)) return null;
+
+  const stem = normalize(m.groups['stem']!);
+  const kind = table.globals.get(stem)?.kind ?? stdlib?.byNormalized.get(stem)?.kind;
+  if (kind !== '処理単語') return null;
+  return m[0];
 }

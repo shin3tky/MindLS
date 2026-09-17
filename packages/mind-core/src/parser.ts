@@ -11,6 +11,7 @@
  */
 
 import {
+  ARRAY_SUFFIX,
   ATTRIBUTE_WORDS,
   blockRoleOf,
   DECLARATION_KEYWORDS,
@@ -79,9 +80,19 @@ export interface ParseDiagnostic {
   readonly code: ParseDiagnosticCode | LexDiagnostic['code'];
 }
 
+/** `"x.src"を　コンパイル。` で取り込まれるソース */
+export interface IncludeRef {
+  /** 引用符を外したままの、書かれているとおりのパス */
+  readonly path: string;
+  /** 文字列定数の範囲（引用符を含む） */
+  readonly range: Range;
+}
+
 export interface ParseResult {
   readonly definitions: readonly Definition[];
   readonly declarations: readonly Declaration[];
+  /** `"x.src"を　コンパイル。` の取り込み。書かれた順に並ぶ */
+  readonly includes: readonly IncludeRef[];
   readonly diagnostics: readonly ParseDiagnostic[];
   readonly tokens: readonly Token[];
   /** トップレベルの `終り。` の位置。以降はコンパイル対象外 */
@@ -343,12 +354,13 @@ export function parse(source: string): ParseResult {
     });
   }
   if (current !== null) {
-    diagnostics.push({
-      message: `\`${current.def.name.raw}\` の定義が \`。\` で閉じられていません`,
-      range: current.def.name.range,
-      severity: 'error',
-      code: 'unterminated-definition',
-    });
+    // ファイル末尾での閉じ忘れは **報告しない**。
+    // 実コンパイラは EOF で定義が閉じたものとして受け付ける
+    // （`fixtures/inf-corpus/unterminated.src` は終了コード 0）。
+    // 入力中はこの状態が普通なので、報告すると打鍵のたびに騒がしくなる。
+    // 次の定義が始まってしまう場合は別で、あちらは実コンパイラもエラーにする
+    // （`b2-unterminated-next-def.src`）。
+    //
     // 入力中の定義は `。` がまだ無いのが普通。範囲をソース末尾まで伸ばしておかないと、
     // 「いまどの定義の中にいるか」が取れず、局所変数の補完が効かなくなる。
     // 末尾トークンではなくソースの末尾まで伸ばす（空白だけの行にカーソルがある場合のため）。
@@ -362,6 +374,7 @@ export function parse(source: string): ParseResult {
   return {
     definitions,
     declarations,
+    includes: findIncludes(tokens),
     diagnostics,
     tokens,
     endOfCompilation: lexed.endOfCompilation,
@@ -382,6 +395,36 @@ export function parse(source: string): ParseResult {
 
 import { BLOCK_SPECS } from './keywords.ts';
 const SPECS = BLOCK_SPECS;
+
+/** 取り込みの指示語（正規形）。`条件コンパイル` は別の語なので当たらない */
+const COMPILE = normalize('コンパイル');
+const QUOTES = /^[「『"“]|[」』"”]$/g;
+
+/**
+ * `"x.src"を　コンパイル。` を拾う。
+ *
+ * レキサに通すと 文字列 → `を` → `コンパイル` → `。` の並びになる。
+ * `条件コンパイル` は正規形が違うので巻き込まない。
+ */
+function findIncludes(tokens: readonly Token[]): IncludeRef[] {
+  const out: IncludeRef[] = [];
+  for (let i = 0; i < tokens.length; i++) {
+    const t = tokens[i]!;
+    if (t.kind !== 'string') continue;
+
+    for (let k = i + 1; k < tokens.length; k++) {
+      const next = tokens[k]!;
+      if (next.kind === 'comment') continue;
+      if (next.kind === 'terminator' || next.kind === 'string') break;
+      if (next.kind !== 'word') break;
+      if (next.normalized !== COMPILE) continue;
+      const path = t.raw.replace(QUOTES, '');
+      if (path !== '') out.push({ path, range: t.range });
+      break;
+    }
+  }
+  return out;
+}
 /** 局所処理単語の並びを終え、親の本体が始まることを示すダミー宣言 */
 const BODY_MARKER = normalize('本体');
 const BLOCK_INDEX = new Map(SPECS.map((s, i) => [s, i] as const));
@@ -495,7 +538,14 @@ function readHeader(head: Token, rest: readonly Token[], visibility: Visibility)
           ? lastWord.raw
           : '処理単語';
 
-  if (defKindToken === undefined && head.particle === 'は' && terminatedHere && lastWord !== undefined) {
+  // 配列は要素の並びが数行続いてから `。` で終わる。その行に `。` が無くても宣言
+  const isArray =
+    defKindToken === undefined &&
+    head.particle === 'は' &&
+    lastWord !== undefined &&
+    lastWord.normalized.endsWith(ARRAY_SUFFIX);
+
+  if (defKindToken === undefined && head.particle === 'は' && (terminatedHere || isArray) && lastWord !== undefined) {
     return {
       type: 'declaration',
       declaration: {

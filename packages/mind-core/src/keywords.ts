@@ -88,6 +88,14 @@ export const DEFINITION_KEYWORDS = new Map<string, string>([
   [n('型紙'), '型紙'],
 ]);
 
+/**
+ * 配列宣言の語尾（正規形）。`文字列定数配列` `数値配列` のように前が付く。
+ *
+ * 配列は `○○は　文字列定数配列` のあと、要素の並びが数行続いてから `。` で終わる。
+ * 語尾で見分けないと、`。` がその行に無いせいで処理単語の定義と誤読してしまう。
+ */
+export const ARRAY_SUFFIX = n('配列');
+
 /** 型紙ブロックの中の `△△は` は、その型の要素（大域に見える） */
 export const TEMPLATE_KIND = '型紙';
 export const TEMPLATE_MEMBER_KIND = '型紙要素';

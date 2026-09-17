@@ -12,10 +12,14 @@
  */
 
 export interface CompileInput {
-  /** コンパイル対象。キーは相対パス、値は UTF-8 のソース */
-  readonly files: ReadonlyMap<string, string>;
-  /** エントリとなるソースの相対パス（拡張子は含まない） */
-  readonly entry: string;
+  /**
+   * コンパイルするソースの絶対パス。
+   *
+   * 中身ではなくパスを渡す。実コンパイラ連携は**保存時にだけ**走らせるので、
+   * ディスクの内容が最新である。パスで渡すと、同じフォルダーにある
+   * `"x.src"を　コンパイル。` の取り込み先もそのままコンパイルできる。
+   */
+  readonly path: string;
   /** リンクする標準ライブラリ。既定は `file` */
   readonly library: string;
 }
@@ -26,8 +30,10 @@ export interface CompileDiagnostic {
   readonly file: string;
   /** 0 始まりの行番号 */
   readonly line: number;
-  /** 0 始まりの UTF-16 コードユニット位置。特定できない場合は null */
+  /** 0 始まりの UTF-16 コードユニット位置。特定できない場合は null（= 行全体） */
   readonly character: number | null;
+  /** 範囲の終端。`character` が null なら null */
+  readonly endCharacter: number | null;
   readonly severity: DiagnosticSeverity;
   readonly message: string;
 }

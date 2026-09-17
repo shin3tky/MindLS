@@ -2,7 +2,7 @@
   "name": "vscode-mind",
   "displayName": "Mind (日本語プログラミング言語)",
   "description": "日本語プログラミング言語 Mind の構文ハイライトと Language Server",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "publisher": "shin3tky",
   "icon": "icon.png",
   "repository": {
@@ -84,8 +84,8 @@
         },
         "mind.diagnostics.undefinedWords": {
           "type": "boolean",
-          "default": false,
-          "description": "定義されていない単語を指摘する。`\"x.src\"を　コンパイル。` で取り込む他ファイルの単語をまだ追えないため、複数ファイルのプログラムでは誤検出になる。既定は無効。"
+          "default": true,
+          "description": "定義されていない単語を指摘する。`\"x.src\"を　コンパイル。` でつながるファイルは一緒に見る。取り込み先が 1 つでも見つからないときと、`mind.library` が `file` 以外のときは、語彙を把握しきれないので自動的に黙る。"
         },
         "mind.diagnostics.forwardReferences": {
           "type": "boolean",
@@ -105,12 +105,12 @@
         "mind.compiler.docker.image": {
           "type": "string",
           "default": "mind-docker:8.0.08",
-          "description": "実コンパイラ連携に使う Docker イメージ。空にすると連携を無効にする。"
+          "description": "実コンパイラ連携に使う Docker イメージ。https://github.com/shin3tky/Mind-Docker で作る。"
         },
         "mind.compiler.enabled": {
           "type": "boolean",
           "default": false,
-          "description": "保存時に実 Mind コンパイラで文法チェックする（Docker が必要）。既定は無効で、自前解析だけで動く。"
+          "description": "保存したときに実 Mind コンパイラで検査する。Docker と mind-docker イメージが要る。既定は無効で、自前解析だけで動く。"
         },
         "mind.trace.server": {
           "type": "string",

@@ -17,6 +17,7 @@ export { parse } from './parser.ts';
 export type {
   Declaration,
   Definition,
+  IncludeRef,
   ParseDiagnostic,
   ParseDiagnosticCode,
   ParseResult,

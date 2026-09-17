@@ -108,8 +108,17 @@ describe('定義の閉じ忘れ', () => {
     expect(codes('メインとは\n　表示し\n次とは\n　表示すること。')).toContain('unterminated-definition');
   });
 
-  it('ファイル末尾でも報告する', () => {
-    expect(codes('メインとは\n　表示し')).toContain('unterminated-definition');
+  it('ファイル末尾では報告しない（実コンパイラが通すため）', () => {
+    // `fixtures/inf-corpus/unterminated.src` は本物の mind が終了コード 0 で通す。
+    // EOF が定義を閉じる。入力中はこの状態が普通でもあるので、黙っている。
+    expect(codes('メインとは\n　表示し')).toEqual([]);
+  });
+
+  it('それでも定義としては拾えている（補完のために範囲はソース末尾まで伸ばす）', () => {
+    const r = parse('メインとは\n　作業は　変数\n　表示し');
+    expect(r.definitions).toHaveLength(1);
+    expect(r.definitions[0]!.locals.map((l) => l.name.raw)).toEqual(['作業']);
+    expect(r.definitions[0]!.range.end.line).toBe(2);
   });
 });
 

@@ -11,7 +11,7 @@ Language Server と VS Code 拡張。
 | パッケージ | 役割 |
 |---|---|
 | `@mindls/core` | 正規化・レキサ・パーサ・シンボルテーブル・診断・リネーム・Semantic Tokens。エディタ非依存 |
-| `@mindls/compiler` | 実 Mind コンパイラを叩くアダプタ（オプトイン・未実装） |
+| `@mindls/compiler` | `.inf` の解析と、Docker の中の実 Mind コンパイラを叩くアダプタ |
 | `@mindls/language-server` | LSP 本体（stdio） |
 | `vscode-mind` | VS Code 拡張 |
 
@@ -26,8 +26,29 @@ npm run bundle    # 配布用に esbuild で束ねる
 npm run package   # .vsix を作る
 ```
 
+> **`node_modules` を OS 間で共有しないでください。**
+> esbuild と rolldown（Vitest）はネイティブバイナリを持ち、`@esbuild/darwin-arm64` の
+> ように **OS ごとに別のパッケージ**として入ります。同じフォルダーを macOS と
+> Linux（WSL2・コンテナ・リモート開発）の両方から触ると、片方が
+> 「You installed esbuild for another platform than the one you're currently using」で
+> 止まります。触った側で `npm install` を流し直すのが基本の直しかたです。
+> 両方から使いたいなら、足りないほうを消さずに足します。
+>
+> ```sh
+> npm install --no-save --no-package-lock --force \
+>   --os=darwin --cpu=arm64 @esbuild/darwin-arm64@$(node -p "require('esbuild').version")
+> ```
+
 必要なのは **Node.js 22 以上**と **VS Code 1.90 以上**だけです。
-**Docker も Mind の配布物も要りません。** 標準単語辞書は生成済みのものをコミットしてあります。
+**Docker も Mind の配布物も要りません。** 標準単語辞書も、実コンパイラの `.inf` のコーパスも、
+生成済みのものをコミットしてあります。
+
+Docker が要るのは次の 2 つだけで、どちらも任意です。
+
+| したいこと | 要るもの |
+|---|---|
+| 保存時に本物の Mind で検査する（`mind.compiler.enabled`） | `mind-docker:8.0.08` イメージ |
+| `.inf` のコーパスを集め直す（`tools/collect-inf.sh`） | 同上 |
 
 ## VS Code で試す
 
@@ -83,18 +104,10 @@ code --extensionDevelopmentPath="$PWD/packages/vscode-mind" examples
 | `二乗し` | 定義より前での参照（`仮定義` が要る） |
 | `表示しないこと。` | 否定形の送り仮名は照合前に落ちるので、肯定形と同じ単語になる |
 
-未定義単語の診断は**既定で無効**です。開発ホストの設定で有効にすると挙動を見られます。
-
-```jsonc
-// examples/.vscode/settings.json
-{
-  "mind.diagnostics.undefinedWords": true
-}
-```
-
-`"x.src"を　コンパイル。` で取り込む他ファイルの単語をまだ追えないため、
-複数ソースに分かれたプログラムでは誤検出になります。既定値の理由は
-[`docs/PLAN.md` の M5](docs/PLAN.md) にあります。
+未定義単語の診断は `"x.src"を　コンパイル。` でつながるファイルを一緒に見ます。
+ただし**語彙を把握しきれないと分かったら黙ります** — 取り込み先が 1 つでも見つからないとき、
+`mind.library` が `file` 以外のとき、取り込みの関係がまったく無く `メイン` も無いとき
+（＝ライブラリとして書かれた断片）。理由は [`docs/PLAN.md`](docs/PLAN.md) にあります。
 
 ### 3. 変更を反映する
 
@@ -172,6 +185,38 @@ vsce はこれを .vsix に入れられません。そこで **esbuild で束ね
 
 ### 7. Marketplace に公開する
 
+#### リリース手順（2 回目以降）
+
+```sh
+# 1. 出すものを確かめる
+npm run typecheck && npm test
+npm run package                     # dist/vscode-mind-<version>.vsix
+
+# 2. 1 コミットにまとめてタグを打つ
+git add -A
+git commit -m "vscode-mind 0.0.2 をリリース."
+git tag v0.0.2
+git push origin main --tags
+
+# 3. 確かめたその .vsix を送る
+npx vsce publish --packagePath dist/vscode-mind-0.0.2.vsix
+```
+
+出す前に見るところ。
+
+| | |
+|---|---|
+| `packages/vscode-mind/package.json` の `version` | 上げてあるか |
+| `CHANGELOG.md`（ルートと `packages/vscode-mind/`） | **2 つある。両方**に同じ内容が要る（.vsix に入るのは後者） |
+| `README.md`（ルートと `packages/vscode-mind/`） | 設定の既定値が実装と合っているか |
+| `npm run package` の出力 | `dist/` `syntaxes/` `icon.png` `readme.md` `changelog.md` `LICENSE.txt` の 12 ファイル |
+
+> **バージョンは `vsce publish patch` でも上げられます**が、これは `npm version` を呼ぶので
+> **コミットとタグが自動で増えます**。1 PR = 1 コミットにまとめたいときは、
+> 上のように自分で `version` を書き換えてから `--packagePath` で送るほうが扱いやすいです。
+
+#### はじめて公開するとき
+
 `.vsix` を配るだけなら publisher ID は要りませんが、Marketplace に載せるなら要ります。
 ID は**あとから変更できません**。拡張の URL に入るので慎重に決めてください。
 
@@ -190,7 +235,7 @@ ID は**あとから変更できません**。拡張の URL に入るので慎�
 ```sh
 npx vsce login <publisher id>   # PAT を聞かれる。どこで実行してもよい
 npm run package                 # dist/*.vsix を作って中身を確認する
-npx vsce publish --packagePath dist/vscode-mind-0.0.1.vsix
+npx vsce publish --packagePath dist/vscode-mind-<version>.vsix
 ```
 
 `--packagePath` を使うと、**確認したその .vsix をそのまま送れます**（マニフェストは
@@ -207,9 +252,6 @@ npm run release      # = npm run release -w vscode-mind = vsce publish --no-depe
 > 「Missing vscode engine compatibility version」になります。
 > パスで指したいときは `--packagePath`、拡張のフォルダーで実行したいときは
 > `cd packages/vscode-mind && npx vsce publish --no-dependencies` です。
-
-バージョンを上げて出すときは `npx vsce publish minor` のように渡します
-（`package.json` の更新と git のタグ付けまでやってくれます）。
 
 > **2026年12月1日に Azure DevOps のグローバル PAT が廃止されます。**
 > CI から公開するなら、PAT ではなく Microsoft Entra ID（`vsce publish --azure-credential`）に
@@ -238,19 +280,19 @@ Mind: このワークスペースの文字コードと関連付けを設定す�
 
 Language Server は VS Code から UTF-8 のテキストを受け取るので、
 **解析そのものは文字コードに依存しません。**
-変換が要るのは実コンパイラ連携（オプトイン・未実装）のときだけです。
+変換が要るのは実コンパイラ連携のときだけで、それもコンテナの中の `iconv` にやらせています。
 
 ## 設定
 
 | 設定 | 既定 | 内容 |
 |---|---|---|
 | `mind.library` | `file` | リンクする標準ライブラリ |
-| `mind.diagnostics.undefinedWords` | `false` | 定義されていない単語を指摘する |
+| `mind.diagnostics.undefinedWords` | `true` | 定義されていない単語を指摘する。`コンパイル` でつながるファイルは一緒に見る |
 | `mind.diagnostics.forwardReferences` | `true` | 定義より前での参照を指摘する |
 | `mind.diagnostics.negativeForms` | `true` | 否定形の送り仮名を指摘する |
 | `mind.diagnostics.commentParens` | `true` | 空白不足で成立していない `（ ）` コメントを指摘する |
-| `mind.compiler.enabled` | `false` | 保存時に実 Mind コンパイラで検査する（Docker が要る・未実装） |
-| `mind.compiler.docker.image` | `mind-docker:8.0.08` | 実コンパイラ連携に使うイメージ |
+| `mind.compiler.enabled` | `false` | 保存時に本物の Mind コンパイラで検査する（Docker が要る） |
+| `mind.compiler.docker.image` | `mind-docker:8.0.08` | そのときに使うイメージ |
 | `mind.trace.server` | `off` | LSP のやりとりを出力パネルに記録する |
 
 ## アイコン

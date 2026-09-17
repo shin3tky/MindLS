@@ -98,12 +98,21 @@ export class LspClient {
     }
   }
 
-  async initialize(initializationOptions?: unknown): Promise<unknown> {
+  /** たまっている通知の数 */
+  pendingNotifications(method: string): number {
+    return this.notifications.filter((n) => n.method === method).length;
+  }
+
+  async initialize(
+    initializationOptions?: unknown,
+    extra: Record<string, unknown> = {},
+  ): Promise<unknown> {
     const result = await this.request('initialize', {
       processId: process.pid,
       rootUri: null,
       capabilities: {},
       initializationOptions,
+      ...extra,
     });
     this.notify('initialized', {});
     return result;

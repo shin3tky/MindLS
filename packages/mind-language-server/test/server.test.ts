@@ -1,6 +1,7 @@
-import { readFileSync } from 'node:fs';
+import { mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
@@ -217,21 +218,22 @@ describe('診断の配線（実プロセス）', () => {
     await client.dispose();
   }, 20_000);
 
-  it('未定義単語は既定では報告しない', async () => {
+  it('initializationOptions で未定義単語を切れる', async () => {
     const client = new LspClient();
-    await client.initialize();
+    await client.initialize({ diagnostics: { undefinedWords: false } });
     client.openDocument('file:///tmp/unknown.src', 'メインとは\n　知らない単語すること。');
     const params = await client.waitForNotification('textDocument/publishDiagnostics');
     expect(codesOf(params)).not.toContain('undefined-word');
     await client.dispose();
   }, 20_000);
 
-  it('initializationOptions で未定義単語を有効にできる', async () => {
+  it('標準ライブラリが file 以外なら未定義単語は黙る', async () => {
+    // guilib などの語彙は辞書を持っていない。知らないだけのものを未定義とは言えない
     const client = new LspClient();
-    await client.initialize({ diagnostics: { undefinedWords: true } });
+    await client.initialize({ library: 'guilib' });
     client.openDocument('file:///tmp/unknown2.src', 'メインとは\n　知らない単語すること。');
     const params = await client.waitForNotification('textDocument/publishDiagnostics');
-    expect(codesOf(params)).toContain('undefined-word');
+    expect(codesOf(params)).not.toContain('undefined-word');
     await client.dispose();
   }, 20_000);
 
@@ -333,5 +335,115 @@ describe('リネーム（実プロセス）', () => {
       }),
     ).rejects.toThrow(/予約語|定義されていません/);
     await c.dispose();
+  }, 20_000);
+});
+
+describe('実コンパイラ連携（実プロセス）', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'mindls-compiler-'));
+  const file = join(dir, 'save.src');
+  writeFileSync(file, 'メインとは\n　「あ」を　一行表示すること。\n', 'utf8');
+  const uri = pathToFileURL(file).href;
+
+  const open = async (compiler: unknown) => {
+    const client = new LspClient();
+    await client.initialize(
+      { compiler },
+      { workspaceFolders: [{ uri: pathToFileURL(dir).href, name: 'w' }] },
+    );
+    client.openDocument(uri, readFileSync(file, 'utf8'));
+    await client.waitForNotification('textDocument/publishDiagnostics');
+    await new Promise((r) => setTimeout(r, 50));
+    client.drainNotifications('textDocument/publishDiagnostics');
+    return client;
+  };
+
+  it('保存の通知を受け取ると宣言している', async () => {
+    const client = new LspClient();
+    const result = (await client.initialize()) as {
+      capabilities: { textDocumentSync: { save?: unknown } };
+    };
+    expect(result.capabilities.textDocumentSync.save).toBeDefined();
+    await client.dispose();
+  }, 20_000);
+
+  it('既定では保存しても何も起きない', async () => {
+    const client = await open({ enabled: false });
+    client.notify('textDocument/didSave', { textDocument: { uri } });
+    await new Promise((r) => setTimeout(r, 400));
+    expect(client.pendingNotifications('textDocument/publishDiagnostics')).toBe(0);
+    await client.dispose();
+  }, 20_000);
+
+  it('有効にすると、コンパイラを呼べない理由を警告として出す', async () => {
+    // この環境には docker が無い（あってもイメージが無い）。
+    // 黙って何も起きないのではなく、理由が出ることを確かめたい
+    const client = await open({ enabled: true, docker: { image: 'mindls-test:absent' } });
+    client.notify('textDocument/didSave', { textDocument: { uri } });
+    const params = (await client.waitForNotification(
+      'textDocument/publishDiagnostics',
+      15_000,
+    )) as { diagnostics: Array<{ source: string; severity: number; message: string }> };
+    const fromCompiler = params.diagnostics.filter((d) => d.source === 'mind (コンパイラ)');
+    expect(fromCompiler).toHaveLength(1);
+    expect(fromCompiler[0]!.severity).toBe(2); // Warning
+    await client.dispose();
+  }, 30_000);
+});
+
+describe('取り込みを見た未定義単語の診断（実プロセス）', () => {
+  const build = (files: Record<string, string>): string => {
+    const dir = mkdtempSync(join(tmpdir(), 'mindls-imports-'));
+    for (const [name, text] of Object.entries(files)) writeFileSync(join(dir, name), text, 'utf8');
+    return dir;
+  };
+
+  const codesFor = async (dir: string, name: string): Promise<string[]> => {
+    const client = new LspClient();
+    await client.initialize(undefined, {
+      workspaceFolders: [{ uri: pathToFileURL(dir).href, name: 'w' }],
+    });
+    const file = join(dir, name);
+    client.openDocument(pathToFileURL(file).href, readFileSync(file, 'utf8'));
+    const params = (await client.waitForNotification('textDocument/publishDiagnostics')) as {
+      diagnostics: Array<{ code: string }>;
+    };
+    await client.dispose();
+    return params.diagnostics.map((d) => d.code);
+  };
+
+  it('取り込み先で定義された単語は未定義にしない', async () => {
+    const dir = build({
+      'main.src': '"sub.src"を　コンパイル。\n\nメインとは\n　３を　二乗し　数値表示すること。',
+      'sub.src': '二乗とは　（数値　→　数値）\n　複写し　掛けること。',
+    });
+    expect(await codesFor(dir, 'main.src')).toEqual([]);
+  }, 20_000);
+
+  it('どこにも無い単語は既定で未定義と言う', async () => {
+    const dir = build({ 'main.src': 'メインとは\n　まったく知らない単語すること。' });
+    expect(await codesFor(dir, 'main.src')).toEqual(['undefined-word']);
+  }, 20_000);
+
+  it('取り込みとも無縁で メイン も無いファイルでは黙る', async () => {
+    // ライブラリとして書かれた断片。どこから取り込まれるかが分からないので、
+    // 見えていない語彙があるとみなす（マニュアル 02: `メイン` はプログラムの入口）
+    const dir = build({ '断片.src': '下請けとは\n　まったく知らない単語すること。' });
+    expect(await codesFor(dir, '断片.src')).toEqual([]);
+  }, 20_000);
+
+  it('取り込まれていれば、メイン が無くても診断する', async () => {
+    const dir = build({
+      'main.src': '"sub.src"を　コンパイル。\nメインとは\n　下請けすること。',
+      'sub.src': '下請けとは\n　まったく知らない単語すること。',
+    });
+    expect(await codesFor(dir, 'sub.src')).toEqual(['undefined-word']);
+  }, 20_000);
+
+  it('取り込み先が見つからなければ黙る', async () => {
+    // 見えていないものを未定義と呼ぶのは誤検出でしかない
+    const dir = build({
+      'main.src': '"どこにも無い.src"を　コンパイル。\nメインとは\n　まったく知らない単語すること。',
+    });
+    expect(await codesFor(dir, 'main.src')).toEqual([]);
   }, 20_000);
 });

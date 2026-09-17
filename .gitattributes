@@ -14,3 +14,6 @@
 
 # 配布物
 *.tgz binary
+
+# .inf のコーパスは EUC-JP の原本。Git に内容を触らせない
+fixtures/inf-corpus/collected/** -text

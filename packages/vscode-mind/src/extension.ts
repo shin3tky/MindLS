@@ -51,7 +51,11 @@ async function startLanguageServer(context: vscode.ExtensionContext): Promise<vo
     documentSelector: [{ scheme: 'file', language: 'mind' }],
     // 起動直後の解析にも設定を効かせたいので、初回分は initializationOptions で渡す。
     // 以降の変更は workspace/didChangeConfiguration で届く。
-    initializationOptions: { diagnostics: diagnosticSettings() },
+    initializationOptions: {
+      diagnostics: diagnosticSettings(),
+      compiler: compilerSettings(),
+      library: vscode.workspace.getConfiguration('mind').get<string>('library'),
+    },
     synchronize: {
       fileEvents: vscode.workspace.createFileSystemWatcher('**/*.{src,mnd}'),
     },
@@ -65,10 +69,21 @@ async function startLanguageServer(context: vscode.ExtensionContext): Promise<vo
 function diagnosticSettings(): Record<string, boolean> {
   const config = vscode.workspace.getConfiguration('mind');
   return {
-    undefinedWords: config.get<boolean>('diagnostics.undefinedWords') ?? false,
+    undefinedWords: config.get<boolean>('diagnostics.undefinedWords') ?? true,
     forwardReferences: config.get<boolean>('diagnostics.forwardReferences') ?? true,
     negativeForms: config.get<boolean>('diagnostics.negativeForms') ?? true,
     commentParens: config.get<boolean>('diagnostics.commentParens') ?? true,
+  };
+}
+
+/** `mind.compiler.*` を Language Server に渡す形にまとめる */
+function compilerSettings(): { enabled: boolean; docker: { image: string } } {
+  const config = vscode.workspace.getConfiguration('mind');
+  return {
+    enabled: config.get<boolean>('compiler.enabled') ?? false,
+    docker: {
+      image: config.get<string>('compiler.docker.image') ?? 'mind-docker:8.0.08',
+    },
   };
 }
 
