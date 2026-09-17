@@ -15,6 +15,7 @@
     "watch": "tsc --build --watch",
     "bundle": "node tools/bundle.mts",
     "package": "npm run package -w vscode-mind",
+    "release": "npm run release -w vscode-mind",
     "clean": "tsc --build --clean",
     "typecheck": "tsc --build --force",
     "test": "vitest run",

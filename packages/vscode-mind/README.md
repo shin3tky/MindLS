@@ -3,8 +3,6 @@
 日本語プログラミング言語 [Mind](https://www.scripts-lab.co.jp/mind/whatsmind.html)（Scripts Lab Inc.）を
 VS Code で書くための拡張です。**Mind の配布物も Docker も要りません。**
 
-![アイコン](icon.png)
-
 ## できること
 
 | | |

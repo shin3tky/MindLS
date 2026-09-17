@@ -170,10 +170,58 @@ vsce はこれを .vsix に入れられません。そこで **esbuild で束ね
 
 できた .vsix は VS Code の拡張ビューの `…` → 「VSIX からのインストール」で入れられます。
 
-> Marketplace に出すときは `packages/vscode-mind/package.json` の `publisher` を
-> 自分のパブリッシャー ID に直してください（いまは `shin3tky` を仮に入れてあります）。
+### 7. Marketplace に公開する
 
-### 7. 文字コードについて
+`.vsix` を配るだけなら publisher ID は要りませんが、Marketplace に載せるなら要ります。
+ID は**あとから変更できません**。拡張の URL に入るので慎重に決めてください。
+
+1. **Azure DevOps の組織を作る**（Microsoft アカウントが要ります）
+   <https://aex.dev.azure.com/>
+2. **Personal Access Token を発行する**
+   User settings → Personal access tokens → New Token
+   - Organization: **All accessible organizations**（特定の組織を選ぶと弾かれます）
+   - Scopes: Custom defined → Show all scopes → **Marketplace: Manage**
+   - 発行直後にしか表示されないので、その場で控える
+3. **パブリッシャーを作る** <https://marketplace.visualstudio.com/manage>
+   PAT と同じ Microsoft アカウントで入り、「Create publisher」。ID と表示名を入れる
+4. **`packages/vscode-mind/package.json` の `publisher` を、作った ID に直す**
+5. 公開する
+
+```sh
+npx vsce login <publisher id>   # PAT を聞かれる。どこで実行してもよい
+npm run package                 # dist/*.vsix を作って中身を確認する
+npx vsce publish --packagePath dist/vscode-mind-0.0.1.vsix
+```
+
+`--packagePath` を使うと、**確認したその .vsix をそのまま送れます**（マニフェストは
+.vsix の中から読むので、リポジトリのどこで実行しても構いません）。
+作り直しながら出すなら次でも同じです。
+
+```sh
+npm run release      # = npm run release -w vscode-mind = vsce publish --no-dependencies
+```
+
+> `vsce` はサブコマンドに拡張のパスを取りません。`vsce publish <何か>` の引数は
+> **バージョン**（`patch` `minor` `1.0.0`）と解釈されます。パスを渡すと、そのまま
+> リポジトリのルートの `package.json` を読みにいき
+> 「Missing vscode engine compatibility version」になります。
+> パスで指したいときは `--packagePath`、拡張のフォルダーで実行したいときは
+> `cd packages/vscode-mind && npx vsce publish --no-dependencies` です。
+
+バージョンを上げて出すときは `npx vsce publish minor` のように渡します
+（`package.json` の更新と git のタグ付けまでやってくれます）。
+
+> **2026年12月1日に Azure DevOps のグローバル PAT が廃止されます。**
+> CI から公開するなら、PAT ではなく Microsoft Entra ID（`vsce publish --azure-credential`）に
+> 寄せておくのが無難です。
+
+`vsce` は公開時に次を弾きます。いまの構成はどれにも触れていません。
+
+- `icon` が SVG
+- `README.md` / `CHANGELOG.md` の画像が https で解決できない（相対パスは repository から補完されます）
+- パッケージに秘密情報らしき文字列が混ざっている
+
+### 8. 文字コードについて
 
 本物の Mind のソースは **EUC-JP**（Linux 版）または **Shift_JIS**（Windows 版）です。
 VS Code の既定は UTF-8 なので、そのまま開くと日本語が化けます。

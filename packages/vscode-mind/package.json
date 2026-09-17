@@ -37,7 +37,8 @@
     "build": "tsc --build",
     "bundle": "node ../../tools/bundle.mts",
     "vscode:prepublish": "node ../../tools/bundle.mts",
-    "package": "vsce package --no-dependencies --out ../../dist/"
+    "package": "vsce package --no-dependencies --out ../../dist/",
+    "release": "vsce publish --no-dependencies"
   },
   "contributes": {
     "languages": [
