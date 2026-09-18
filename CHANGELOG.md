@@ -5,6 +5,16 @@
 
 ## [未リリース]
 
+### 変更
+
+- **対応する VS Code の下限を 1.91 に上げた**（`engines.vscode: ^1.91.0`）。同梱の
+  `vscode-languageclient` 10.1.1 がもともと 1.91 以上を要求しており、1.90 という表記が実態と合っていなかった
+- 直接の依存を `package.json` で版固定にした（`^` を外し、`.npmrc` に `save-exact=true`）。
+  入る版は変わらない（`package-lock.json` の解決結果は `@types/vscode` 以外同じ）
+- `@types/vscode` を 1.137.0 から **1.91.0**（`engines.vscode` の下限）に下げ、`packages/vscode-mind` に移した。
+  下限より新しい API を使うと型エラーになり、`vsce package` も版の食い違いを検査するようになった。
+  Dependabot では `versioning-strategy: increase` を明示し、`@types/vscode` を対象から外した
+
 ## [0.1.1] - 2026-09-18
 
 ### セキュリティ

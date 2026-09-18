@@ -33,6 +33,20 @@ Pull Request では新しく持ち込まれる脆弱性を比較し、`main` へ
 および手動実行では依存関係全体を検査します。結果は GitHub の Code scanning に登録されます。
 Dependabot は npm パッケージと GitHub Actions の更新を週次で確認し、更新PRを作成します。
 
+#### 依存の版
+
+直接の依存は `package.json` で**版を固定**しています（`^` を付けない）。`.npmrc` の
+`save-exact=true` により、`npm install <パッケージ>` で足したものも固定で書かれます。
+版を上げるのは Dependabot の PR（`package.json` と `package-lock.json` を一緒に書き換える）を通すときだけです。
+
+- `@mindls/*` はワークスペース内の参照なので `*` のまま
+- `engines`（`node` と `vscode`）は依存ではなく対応する下限なので範囲のまま
+- **`@types/vscode` は `engines.vscode` の下限と同じ版に固定**し、Dependabot の対象から外しています。
+  新しい型を入れると、下限の VS Code に無い API を使っても型エラーにならないためです。
+  `packages/vscode-mind` の devDependencies に置いてあるので、`vsce package` も食い違いを検査します。
+  上げるときは `engines.vscode` と `@types/vscode` を同じ PR で上げてください
+  （いまの下限 1.91 は `vscode-languageclient` 10.x の要求に合わせたもの）
+
 > **`node_modules` を OS 間で共有しないでください。**
 > esbuild と rolldown（Vitest）はネイティブバイナリを持ち、`@esbuild/darwin-arm64` の
 > ように **OS ごとに別のパッケージ**として入ります。同じフォルダーを macOS と
@@ -46,7 +60,7 @@ Dependabot は npm パッケージと GitHub Actions の更新を週次で確認
 >   --os=darwin --cpu=arm64 @esbuild/darwin-arm64@$(node -p "require('esbuild').version")
 > ```
 
-必要なのは **Node.js 26.5 以上**と **VS Code 1.90 以上**だけです。
+必要なのは **Node.js 26.5 以上**と **VS Code 1.91 以上**だけです。
 開発時のTypeScriptコンパイラは **TypeScript 7.0** を使用します。
 **Docker も Mind の配布物も要りません。** 標準単語辞書も、実コンパイラの `.inf` のコーパスも、
 生成済みのものをコミットしてあります。

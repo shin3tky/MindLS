@@ -3,12 +3,19 @@ version: 2
 updates:
   - package-ecosystem: npm
     directory: /
+    # 直接の依存は package.json で版を固定している（.npmrc の save-exact=true）。
+    # 更新は package.json と package-lock.json の両方を書き換える PR として届く。
+    versioning-strategy: increase
     schedule:
       interval: weekly
       day: monday
       time: '09:00'
       timezone: Asia/Tokyo
     open-pull-requests-limit: 5
+    ignore:
+      # 型は engines.vscode（対応する VS Code の下限）に合わせて固定する。
+      # 上げるのは engines.vscode を上げると決めたときだけ（README「依存の版」）。
+      - dependency-name: '@types/vscode'
     groups:
       npm-development:
         dependency-type: development
