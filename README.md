@@ -31,6 +31,7 @@ npm run package   # .vsix を作る
 依存パッケージは、GitHub Actions の OSV-Scanner で `package-lock.json` を検査します。
 Pull Request では新しく持ち込まれる脆弱性を比較し、`main` への push、毎週月曜日、
 および手動実行では依存関係全体を検査します。結果は GitHub の Code scanning に登録されます。
+Dependabot は npm パッケージと GitHub Actions の更新を週次で確認し、更新PRを作成します。
 
 > **`node_modules` を OS 間で共有しないでください。**
 > esbuild と rolldown（Vitest）はネイティブバイナリを持ち、`@esbuild/darwin-arm64` の
