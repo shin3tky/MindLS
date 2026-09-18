@@ -55,6 +55,7 @@ async function startLanguageServer(context: vscode.ExtensionContext): Promise<vo
       diagnostics: diagnosticSettings(),
       compiler: compilerSettings(),
       library: vscode.workspace.getConfiguration('mind').get<string>('library'),
+      distribution: vscode.workspace.getConfiguration('mind').get<string>('distribution'),
     },
     synchronize: {
       fileEvents: vscode.workspace.createFileSystemWatcher('**/*.{src,mnd}'),
@@ -93,12 +94,20 @@ async function stopLanguageServer(): Promise<void> {
   if (running !== undefined) await running.stop();
 }
 
-/** Mind のソースが取りうる文字コード。プラットフォームで決まる。 */
-function encodingForPlatform(): { id: string; label: string } {
-  // Windows 版 Mind は Shift_JIS、Linux 版は EUC-JP
-  return process.platform === 'win32'
-    ? { id: 'shiftjis', label: 'Shift_JIS（Windows 版 Mind）' }
-    : { id: 'eucjp', label: 'EUC-JP（Linux 版 Mind）' };
+const SHIFT_JIS = { id: 'shiftjis', label: 'Shift_JIS（Windows 版 Mind）' };
+const EUC_JP = { id: 'eucjp', label: 'EUC-JP（Linux 版 Mind）' };
+
+/**
+ * Mind のソースが取りうる文字コード。`mind.distribution` で決まる
+ * （Windows 版 Mind は Shift_JIS、Linux 版は EUC-JP）。
+ * 配布物の ID と別名は packages/mind-core/data/distributions.json にある。
+ */
+function encodingForDistribution(): { id: string; label: string } {
+  const value = (vscode.workspace.getConfiguration('mind').get<string>('distribution') ?? '')
+    .trim()
+    .toLowerCase();
+  if (value.startsWith('linux') || value === 'mind8' || value === '8') return EUC_JP;
+  return SHIFT_JIS;
 }
 
 /**
@@ -115,12 +124,12 @@ async function configureWorkspace(): Promise<void> {
     return;
   }
 
-  const encoding = encodingForPlatform();
+  const encoding = encodingForDistribution();
+  const others = [SHIFT_JIS, EUC_JP].filter((e) => e.id !== encoding.id);
   const picked = await vscode.window.showQuickPick(
     [
-      { label: encoding.label, id: encoding.id },
-      { label: 'EUC-JP（Linux 版 Mind）', id: 'eucjp' },
-      { label: 'Shift_JIS（Windows 版 Mind）', id: 'shiftjis' },
+      { label: encoding.label, id: encoding.id, description: 'mind.distribution に合わせた既定' },
+      ...others.map((e) => ({ label: e.label, id: e.id })),
       { label: 'UTF-8 のまま（ラッパーで変換する構成）', id: 'utf8' },
     ],
     { title: 'Mind のソースの文字コード', placeHolder: encoding.label },

@@ -65,6 +65,9 @@ const STRING_PAIRS: ReadonlyArray<readonly [string, string]> = [
   ['『', '』'],
   ['"', '"'],
   ['“', '”'],
+  // Shift_JIS の全角二重引用符（0x8168）。開きも閉じも同じ字で書かれる（Mind 9 の sample/playSound.src）
+  ['”', '”'],
+  ['＂', '＂'],
 ];
 
 const CHAR_QUOTES = new Set(["'", '’', '＇']);

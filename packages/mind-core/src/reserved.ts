@@ -95,12 +95,66 @@ const ELEMENTARY_FUNCTIONS: readonly ReservedWord[] = [
   { name: 'degree', kind: '予約語', stack: '小数 → 小数', doc: '角度（ラジアン）を度に変換。`degree(0.5)` とも `0.5の degreeをとり` とも書ける', source: 'マニュアル 6 数値演算（初等関数）' },
 ];
 
+/**
+ * コンパイラの原始シンボルテーブル（Mind 9 for Windows の `lib/yoyakugo.wrd`）にあって、
+ * 上の表にもライブラリの辞書にも無い語。マニュアルに説明の無いものは、そう書いておく。
+ * 記号（`＋` `：＝` …）と処理属性の記号形（`.N` `NN` …）は別の仕組みで扱うので入れていない。
+ */
+const YOYAKUGO = '原始シンボルテーブル lib/yoyakugo.wrd（Mind 9）';
+
+const PRIMITIVE_SYMBOLS: readonly ReservedWord[] = [
+  { name: 'もし', kind: '予約語', stack: null, doc: 'コンパイラの原始シンボルテーブルにある語（マニュアルに説明が無い）', source: YOYAKUGO },
+  { name: 'アドレス', kind: '予約語', stack: null, doc: 'コンパイラの原始シンボルテーブルにある語（マニュアルに説明が無い）', source: YOYAKUGO },
+  { name: 'Ｍコード', kind: '予約語', stack: null, doc: 'コンパイラの原始シンボルテーブルにある語（マニュアルに説明が無い）', source: YOYAKUGO },
+  { name: 'サイズ', kind: '予約語', stack: null, doc: 'コンパイラの原始シンボルテーブルにある語（マニュアルに説明が無い）', source: YOYAKUGO },
+  { name: '要素サイズ', kind: '予約語', stack: null, doc: 'コンパイラの原始シンボルテーブルにある語（マニュアルに説明が無い）', source: YOYAKUGO },
+  { name: '同じサイズ', kind: '予約語', stack: null, doc: 'コンパイラの原始シンボルテーブルにある語（マニュアルに説明が無い）', source: YOYAKUGO },
+  { name: '同じアドレス', kind: '予約語', stack: null, doc: 'コンパイラの原始シンボルテーブルにある語（マニュアルに説明が無い）', source: YOYAKUGO },
+  { name: 'ロケーション', kind: '予約語', stack: null, doc: 'コンパイラの原始シンボルテーブルにある語（マニュアルに説明が無い）', source: YOYAKUGO },
+  { name: 'おわり', kind: '予約語', stack: null, doc: 'コンパイラの原始シンボルテーブルにある語（マニュアルに説明が無い）', source: YOYAKUGO },
+  { name: '倍精度入力', kind: '予約語', stack: null, doc: '処理属性（倍精度を受け取る）', source: YOYAKUGO },
+  { name: '倍精度出力', kind: '予約語', stack: null, doc: '処理属性（倍精度を返す）', source: YOYAKUGO },
+  { name: '文字列出力', kind: '予約語', stack: null, doc: '処理属性（文字列を返す）', source: YOYAKUGO },
+  { name: 'アセンブラ定義関数', kind: '型名', stack: null, doc: 'カーネル単語表で関数を宣言する', source: YOYAKUGO },
+  { name: 'アセンブラ定義関数２', kind: '型名', stack: null, doc: 'カーネル単語表で関数を宣言する', source: YOYAKUGO },
+  { name: 'アセンブラ定義関数３', kind: '型名', stack: null, doc: 'カーネル単語表で関数を宣言する', source: YOYAKUGO },
+  { name: 'アセンブラ定義ダミー', kind: '型名', stack: null, doc: 'コンパイラの原始シンボルテーブルにある語（マニュアルに説明が無い）', source: YOYAKUGO },
+  { name: '疑似語', kind: '型名', stack: null, doc: 'コンパイラの原始シンボルテーブルにある語（マニュアルに説明が無い）', source: YOYAKUGO },
+  { name: '数値定数', kind: '型名', stack: null, doc: '数値の定数を宣言する', source: YOYAKUGO },
+  { name: '倍精度定数', kind: '型名', stack: null, doc: '倍精度の定数を宣言する', source: YOYAKUGO },
+  { name: '実数定数', kind: '型名', stack: null, doc: '実数の定数を宣言する', source: YOYAKUGO },
+  { name: '単純文字列実体', kind: '型名', stack: null, doc: 'コンパイラの原始シンボルテーブルにある語（マニュアルに説明が無い）', source: YOYAKUGO },
+  { name: '単純文字列集合', kind: '型名', stack: null, doc: 'コンパイラの原始シンボルテーブルにある語（マニュアルに説明が無い）', source: YOYAKUGO },
+  { name: 'バイト定数配列', kind: '型名', stack: null, doc: 'バイトの定数配列を宣言する', source: YOYAKUGO },
+  { name: 'ワード定数配列', kind: '型名', stack: null, doc: 'ワードの定数配列を宣言する', source: YOYAKUGO },
+  { name: '定数配列', kind: '型名', stack: null, doc: '数値の定数配列を宣言する', source: YOYAKUGO },
+  { name: '倍精度定数配列', kind: '型名', stack: null, doc: '倍精度の定数配列を宣言する', source: YOYAKUGO },
+  { name: '実数定数配列', kind: '型名', stack: null, doc: '実数の定数配列を宣言する', source: YOYAKUGO },
+  { name: '文字列定数配列', kind: '型名', stack: null, doc: '文字列の定数配列を宣言する', source: YOYAKUGO },
+  { name: '等価な関数２', kind: '型名', stack: null, doc: '既存の関数と等価な関数を宣言する', source: YOYAKUGO },
+  { name: '等価な関数３', kind: '型名', stack: null, doc: '既存の関数と等価な関数を宣言する', source: YOYAKUGO },
+  { name: 'ランダムファイル', kind: '型名', stack: null, doc: 'ランダムアクセスのファイルを宣言する', source: YOYAKUGO },
+  { name: '拡張構造体', kind: '型名', stack: null, doc: 'コンパイラの原始シンボルテーブルにある語（マニュアルに説明が無い）', source: YOYAKUGO },
+  { name: 'データ領域', kind: '型名', stack: null, doc: 'コンパイラの原始シンボルテーブルにある語（マニュアルに説明が無い）', source: YOYAKUGO },
+  { name: 'コード領域', kind: '型名', stack: null, doc: 'コンパイラの原始シンボルテーブルにある語（マニュアルに説明が無い）', source: YOYAKUGO },
+  { name: '再定義', kind: '型名', stack: null, doc: 'コンパイラの原始シンボルテーブルにある語（マニュアルに説明が無い）', source: YOYAKUGO },
+  { name: 'コンパイル抑止', kind: 'コンパイラ指示', stack: null, doc: '`コンパイル抑止終り` までをコンパイルしない', source: YOYAKUGO },
+  { name: 'コンパイル抑止終り', kind: 'コンパイラ指示', stack: null, doc: '`コンパイル抑止` を閉じる', source: YOYAKUGO },
+  { name: 'ローカル終り', kind: 'コンパイラ指示', stack: null, doc: '`ローカル` の範囲を閉じる', source: YOYAKUGO },
+  { name: 'ローカル語を捨てる', kind: 'コンパイラ指示', stack: null, doc: 'コンパイラの原始シンボルテーブルにある語（マニュアルに説明が無い）', source: YOYAKUGO },
+  { name: '忘れる', kind: 'コンパイラ指示', stack: null, doc: 'コンパイラの原始シンボルテーブルにある語（マニュアルに説明が無い）', source: YOYAKUGO },
+  { name: '自動ブレーク検査', kind: 'コンパイラ指示', stack: null, doc: 'コンパイラの原始シンボルテーブルにある語（マニュアルに説明が無い）', source: YOYAKUGO },
+  { name: '自動ブレーク検査抑止', kind: 'コンパイラ指示', stack: null, doc: 'コンパイラの原始シンボルテーブルにある語（マニュアルに説明が無い）', source: YOYAKUGO },
+  { name: 'ＳＥＴＵＰ＿ＷＯＲＤＳ', kind: 'コンパイラ指示', stack: null, doc: 'コンパイラの原始シンボルテーブルにある語（マニュアルに説明が無い）', source: YOYAKUGO },
+];
+
 export const RESERVED_WORDS: readonly ReservedWord[] = [
   ...VARIABLE_EFFECTS,
   ...CONNECTIVES,
   ...ELEMENTARY_FUNCTIONS,
   ...TYPE_NAMES,
   ...COMPILER_DIRECTIVES,
+  ...PRIMITIVE_SYMBOLS,
 ];
 
 

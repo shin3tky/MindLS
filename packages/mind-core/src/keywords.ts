@@ -77,6 +77,12 @@ export const DECLARATION_KEYWORDS = new Map<string, string>([
   [n('アセンブラ定義の処理単語'), '処理単語'],
 ]);
 
+/**
+ * 型紙から実体を作る語（正規形）。`日時１は　構造体　日時型` のように、うしろに型紙の名前が来る。
+ * 型紙がライブラリにあると、同じ行の語が 2 つになって宣言と分からなくなるので別に持つ。
+ */
+export const STRUCT_KEYWORDS = new Set([n('構造体'), n('暗黙の構造体'), n('拡張構造体')]);
+
 /** 定義に使われる語（正規形 → 種別） */
 export const DEFINITION_KEYWORDS = new Map<string, string>([
   [n('処理単語'), '処理単語'],

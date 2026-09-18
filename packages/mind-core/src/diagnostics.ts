@@ -114,6 +114,7 @@ export function analyze(
   const out: AnalysisDiagnostic[] = [];
   const headers = headerLines(result);
   const end = result.endOfCompilation;
+  const existenceTests = existenceTestOperands(result);
 
   for (const t of result.tokens) {
     if (end !== null && comparePosition(t.range.start, end) >= 0) break;
@@ -131,6 +132,8 @@ export function analyze(
     }
 
     if (!isReference(t, headers)) continue;
+    // `未定義条件コンパイル　Ｘ。` は Ｘ がまだ無いことを問うているので、前方参照でも未定義でもない
+    if (existenceTests.has(t)) continue;
 
     if (options.negativeForms !== false && isNegativeForm(t.raw)) {
       out.push({
@@ -176,6 +179,30 @@ export function analyze(
     });
   }
 
+  return out;
+}
+
+/** 単語の有無だけを問うコンパイラ指示（正規形）。`定義済み条件コンパイル` も送り仮名が落ちて同じになる */
+const EXISTENCE_TESTS = new Set(['定義済条件コンパイル', '未定義条件コンパイル']);
+
+/**
+ * `定義済条件コンパイル　Ｘ。` `未定義条件コンパイル　Ｘ。` の Ｘ。
+ *
+ * これは Ｘ を引用しているのではなく、その時点で定義されているかを問うている。
+ * Mind 9 の配布物では次の形がよく出てくる（mhead.src / mhist.src）。
+ *
+ *   未定義条件コンパイル　ｔａｉｌ動作。
+ *   ｔａｉｌ動作は　数値　０。
+ *   条件コンパイル終り。
+ */
+function existenceTestOperands(result: ParseResult): Set<Token> {
+  const out = new Set<Token>();
+  let armed = false;
+  for (const t of result.tokens) {
+    if (t.kind === 'comment') continue;
+    if (armed && t.kind === 'word') out.add(t);
+    armed = t.kind === 'word' && EXISTENCE_TESTS.has(t.normalized);
+  }
   return out;
 }
 

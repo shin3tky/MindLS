@@ -1,0 +1,61 @@
+{
+  "$comment": "Mind の配布物ごとの定義。配布物の中の置き場所が変わったら layout を直す（パターンは和集合で展開するので、版によって場所が違うなら両方を並べておけばよい）。tools/gen-stdlib-dict.ts・tools/extract-samples.ts・Language Server が読む。",
+  "default": "windows-9",
+  "distributions": {
+    "windows-9": {
+      "label": "Mind 9 for Windows",
+      "platform": "windows",
+      "major": 9,
+      "encoding": "shift_jis",
+      "archive": ["mind-for-windows-9.*.zip", "mind9-windows-9.*.zip"],
+      "aliases": ["windows", "win", "mind9", "9"],
+      "layout": {
+        "marker": ["file/asmword.src", "file/console.src"],
+        "libraries": {
+          "file": ["file/*.src"]
+        },
+        "kernelWords": ["kernel/c_words*.wrd"],
+        "samples": {
+          "sample": ["sample/*.src"],
+          "sampleF": ["sampleF/*.src"],
+          "lesson": ["lesson/*.src"],
+          "tool": ["tool/*.src", "toolUnicode/*.src"]
+        },
+        "fragments": {
+          "srclib": ["srclib/*.src"]
+        },
+        "guiSamples": {
+          "samplew": ["samplew/*.src"],
+          "lesson": ["lesson/hellowin.src"]
+        },
+        "errorSamples": {
+          "lesson": ["lesson/bunpouerr*.src"]
+        },
+        "exclude": ["lesson/bunpouerr*.src", "lesson/hellowin.src"]
+      }
+    },
+    "linux-8": {
+      "label": "Mind 8 for Linux",
+      "platform": "linux",
+      "major": 8,
+      "encoding": "euc-jp",
+      "archive": ["mind-for-linux-8.*.tgz"],
+      "aliases": ["linux", "mind8", "8"],
+      "layout": {
+        "marker": ["file/asmword.src", "file/console.src"],
+        "libraries": {
+          "file": ["file/*.src"]
+        },
+        "kernelWords": ["kernel/c_words*.wrd"],
+        "samples": {
+          "sample": ["sample/*.src"],
+          "sampleF": ["sampleF/*.src"]
+        },
+        "fragments": {},
+        "guiSamples": {},
+        "errorSamples": {},
+        "exclude": []
+      }
+    }
+  }
+}

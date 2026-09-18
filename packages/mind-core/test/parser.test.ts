@@ -206,3 +206,57 @@ describe('属性とユーザ定義型', () => {
     expect(r.declarations.every((d) => d.visibility === 'global' && d.kind === '型紙要素')).toBe(true);
   });
 });
+
+describe('Mind 9 の配布物に出てくる書き方', () => {
+  it('定義の中の条件コンパイルの `。` で定義を閉じない（tool/mhead.src）', () => {
+    const src = [
+      '一つのファイルを処理とは　（ファイル名　→　・）',
+      '\t\t行数は　変数',
+      '　　条件コンパイル　ｔａｉｌ動作。',
+      '\t行数を　表示し',
+      '　　条件コンパイル終り。',
+      '\t行数を　表示し',
+      '\t。',
+    ].join('\n');
+    const r = parse(src);
+    expect(codes(src)).toEqual([]);
+    expect(r.definitions).toHaveLength(1);
+    expect(r.definitions[0]!.range.end.line).toBe(6);
+    expect(r.definitions[0]!.locals.map((l) => l.name.raw)).toEqual(['行数']);
+  });
+
+  it('条件コンパイルで書き分けた見出しは閉じ忘れにしない（samplew/subsource-open-childwin.src）', () => {
+    const src = [
+      '　　未定義条件コンパイル　子ボタン。',
+      'ラベルの窓を開くとは　（・　→　・）',
+      '　　条件コンパイル終り',
+      '　　定義済条件コンパイル　子ボタン。',
+      'ボタンの窓を開くとは　（・　→　・）',
+      '　　条件コンパイル終り',
+      '\t表示し',
+      '\t。',
+    ].join('\n');
+    const r = parse(src);
+    expect(codes(src)).toEqual([]);
+    expect(r.definitions.map((d) => d.name.raw)).toEqual(['ラベルの窓を開く', 'ボタンの窓を開く']);
+  });
+
+  it('本体のある定義に次の見出しが続けば、これまでどおり閉じ忘れ', () => {
+    expect(codes('一とは\n　表示し\n二とは\n　表示すること。')).toContain('unterminated-definition');
+  });
+
+  it('`○○は　構造体　型紙名` は局所宣言（tool/stamp.src）', () => {
+    const r = parse('日時を表示とは　（日時情報　→　・）\n\t\t日時１は　　構造体　日時型\n\t日時１を　表示すること。');
+    expect(r.definitions[0]!.locals).toMatchObject([{ name: { raw: '日時１' }, kind: '構造体' }]);
+  });
+
+  it('`○○は　（・ → ・）` だけの行は局所処理単語（tool/mreplace.src）', () => {
+    const src = ['メインとは', '\t\tｏｐｔは　変数', '　　引数エラーは　（・　→　・）', '\t「誤り」で　重大エラー', '　　本体は', '\t引数エラー', '\t。'].join(
+      '\n',
+    );
+    const r = parse(src);
+    expect(codes(src)).toEqual([]);
+    expect(r.definitions[0]!.localWords.map((w) => w.name.raw)).toEqual(['引数エラー']);
+    expect(r.definitions[0]!.locals.map((l) => l.name.raw)).toEqual(['ｏｐｔ']);
+  });
+});

@@ -101,6 +101,25 @@ describe('定義より前での参照', () => {
     expect(codes(src)).toEqual([]);
   });
 
+  it.each(['未定義条件コンパイル', '定義済条件コンパイル', '定義済み条件コンパイル'])(
+    '%s の対象は引用ではないので報告しない',
+    (directive) => {
+      // Mind 9 の tool/mhead.src と同じ形。まだ定義されていないことを問うている
+      const src = [
+        `　${directive}　ｔａｉｌ動作。`,
+        'ｔａｉｌ動作は　数値　０。',
+        '　条件コンパイル終り。',
+        'メインとは\n　ｔａｉｌ動作を　表示すること。',
+      ].join('\n');
+      expect(codes(src, { stdlib, undefinedWords: true })).toEqual([]);
+    },
+  );
+
+  it('条件コンパイルの式の中の前方参照は報告する', () => {
+    const src = ['　条件コンパイル　ｔａｉｌ動作。', '　条件コンパイル終り。', 'ｔａｉｌ動作は　数値　０。'].join('\n');
+    expect(codes(src)).toEqual(['forward-reference']);
+  });
+
   it('前で定義されていれば報告しない', () => {
     expect(codes('二乗とは\n　掛けること。\nメインとは\n　二乗すること。')).toEqual([]);
   });

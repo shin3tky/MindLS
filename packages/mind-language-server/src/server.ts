@@ -8,8 +8,10 @@
 import {
   createConnection,
   DidChangeConfigurationNotification,
+  MessageType,
   ProposedFeatures,
   ResponseError,
+  ShowMessageNotification,
   TextDocumentSyncKind,
   TextDocuments,
   type Connection,
@@ -52,6 +54,7 @@ import {
   cachedAnalysis,
   forget,
   toDiagnostics,
+  resolveDistributionSetting,
   stdlib,
   toCompletionItems,
   toDocumentSymbols,
@@ -135,12 +138,31 @@ export function startServer(connection: Connection = createConnection(ProposedFe
   let workspaceRoot: string | null = null;
   let compiler: MindCompiler = new NullCompiler();
   let workspace: WorkspaceIndex | null = null;
+  /** `mind.distribution` の値そのもの。解決は stdlib() に任せる */
+  let distribution: string | null = null;
+  const currentStdlib = () => stdlib(distribution);
+
+  /** 未知の配布物が指定されたら 1 回だけ知らせる */
+  let warnedDistribution: string | null = null;
+  const applyDistribution = (raw: unknown): void => {
+    distribution = typeof raw === 'string' && raw.trim() !== '' ? raw : null;
+    const resolved = resolveDistributionSetting(distribution);
+    if (resolved?.fellBack === true && warnedDistribution !== distribution) {
+      warnedDistribution = distribution;
+      // 返事の要らない通知で送る（showWarningMessage は応答を待つリクエストになる）
+      void connection.sendNotification(ShowMessageNotification.type, {
+        type: MessageType.Warning,
+        message: `mind.distribution の「${distribution ?? ''}」は分かりません。${resolved.spec.label}（${resolved.id}）の辞書を使います。`,
+      });
+    }
+  };
 
   connection.onInitialize((params): InitializeResult => {
     const options = params.initializationOptions as
-      | { diagnostics?: unknown; compiler?: unknown; library?: unknown }
+      | { diagnostics?: unknown; compiler?: unknown; library?: unknown; distribution?: unknown }
       | undefined;
     diagnosticSettings = readDiagnosticSettings(options?.diagnostics);
+    applyDistribution(options?.distribution);
     compilerSettings = readCompilerSettings(options?.compiler, options?.library);
     workspaceRoot = rootOf(params);
     workspace = workspaceRoot === null ? null : new WorkspaceIndex(workspaceRoot);
@@ -192,7 +214,7 @@ export function startServer(connection: Connection = createConnection(ProposedFe
     const imports = importsFor(doc);
     const { parsed } = analyze(doc);
     return {
-      stdlib: stdlib(),
+      stdlib: currentStdlib(),
       imported: imports.globals,
       undefinedWords:
         diagnosticSettings.undefinedWords &&
@@ -200,6 +222,8 @@ export function startServer(connection: Connection = createConnection(ProposedFe
         !imports.incomplete &&
         // 標準ライブラリが `file` 以外だと、その語彙の辞書を持っていない
         compilerSettings.library === 'file' &&
+        // 辞書が読めなかった（配布物の定義が壊れているなど）ときも同じ
+        currentStdlib().words.length > 0 &&
         // 取り込みで他のファイルとつながっているか、単体で完結したプログラムか。
         // どちらでもないファイル（取り込まれる側のライブラリ断片など）は、
         // 見えていない語彙があるとみなして黙る
@@ -222,10 +246,11 @@ export function startServer(connection: Connection = createConnection(ProposedFe
   connection.onDidChangeConfiguration((change) => {
     const settings = (
       change.settings as
-        | { mind?: { diagnostics?: unknown; compiler?: unknown; library?: unknown } }
+        | { mind?: { diagnostics?: unknown; compiler?: unknown; library?: unknown; distribution?: unknown } }
         | undefined
     )?.mind;
     diagnosticSettings = readDiagnosticSettings(settings?.diagnostics);
+    applyDistribution(settings?.distribution);
     const next = readCompilerSettings(settings?.compiler, settings?.library);
     // 設定が変わったらコンテナは作り直す
     if (JSON.stringify(next) !== JSON.stringify(compilerSettings)) {
@@ -313,7 +338,7 @@ export function startServer(connection: Connection = createConnection(ProposedFe
     }).replace(/\r?\n$/, '');
 
     return toCompletionItems(
-      completionsAt({ parsed, symbols, stdlib: stdlib(), lineText, position }),
+      completionsAt({ parsed, symbols, stdlib: currentStdlib(), lineText, position }),
     );
   });
 
@@ -324,7 +349,7 @@ export function startServer(connection: Connection = createConnection(ProposedFe
     const info = hoverAt({
       parsed,
       symbols,
-      stdlib: stdlib(),
+      stdlib: currentStdlib(),
       lines: doc.getText().split(/\r?\n/),
       position,
     });
@@ -359,7 +384,7 @@ export function startServer(connection: Connection = createConnection(ProposedFe
     const doc = documents.get(textDocument.uri);
     if (doc === undefined) return { data: [] };
     const { parsed, symbols } = analyze(doc);
-    return { data: encodeSemanticTokens(semanticTokens({ parsed, symbols, stdlib: stdlib() })) };
+    return { data: encodeSemanticTokens(semanticTokens({ parsed, symbols, stdlib: currentStdlib() })) };
   });
 
   connection.onWorkspaceSymbol(({ query }): SymbolInformation[] => {

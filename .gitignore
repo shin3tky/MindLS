@@ -19,6 +19,7 @@ coverage/
 
 # Mind の配布物（再配布しない。Mind-Docker 側で管理する）
 vendor/*.tgz
+vendor/*.zip
 
 # VS Code 拡張のパッケージ
 *.vsix

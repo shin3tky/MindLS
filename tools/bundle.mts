@@ -11,7 +11,7 @@
  */
 
 import { execFileSync } from 'node:child_process';
-import { copyFileSync, mkdirSync, statSync } from 'node:fs';
+import { copyFileSync, mkdirSync, readdirSync, rmSync, statSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -62,10 +62,18 @@ await build({
   outfile: join(OUT, 'server.js'),
 });
 
-// 辞書はバンドルに含めず、隣に置く（analysis.ts がこの名前で探す）
-copyFileSync(join(REPO, 'packages', 'mind-core', 'data', 'stdlib.json'), join(OUT, 'stdlib.json'));
+// 辞書と配布物の定義はバンドルに含めず、隣に置く（analysis.ts がこの構成で探す）
+//   dist/distributions.json
+//   dist/stdlib/<配布物>.json
+const DATA = join(REPO, 'packages', 'mind-core', 'data');
+rmSync(join(OUT, 'stdlib.json'), { force: true }); // 0.0.x の単一辞書の残り
+rmSync(join(OUT, 'stdlib'), { recursive: true, force: true });
+mkdirSync(join(OUT, 'stdlib'), { recursive: true });
+copyFileSync(join(DATA, 'distributions.json'), join(OUT, 'distributions.json'));
+const dictionaries = readdirSync(join(DATA, 'stdlib')).filter((f) => f.endsWith('.json'));
+for (const f of dictionaries) copyFileSync(join(DATA, 'stdlib', f), join(OUT, 'stdlib', f));
 
-for (const name of ['extension.js', 'server.js', 'stdlib.json']) {
+for (const name of ['extension.js', 'server.js', 'distributions.json', ...dictionaries.map((f) => `stdlib/${f}`)]) {
   const kb = (statSync(join(OUT, name)).size / 1024).toFixed(1);
-  console.log(`  ${name.padEnd(14)} ${kb.padStart(8)} KB`);
+  console.log(`  ${name.padEnd(24)} ${kb.padStart(8)} KB`);
 }

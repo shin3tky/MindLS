@@ -211,12 +211,14 @@ Linux / WSL2 なら動くはずだが、需要が見えてからでよい）
 **tgz から直接読める**。Docker を起動する必要はない。
 
 ```sh
-npm run gen:stdlib                      # ../Mind-Docker/vendor/*.tgz を見る
-node tools/gen-stdlib-dict.ts --tgz <path>
-node tools/gen-stdlib-dict.ts --dir <pmind/file>
+npm run gen:stdlib                                   # vendor/ と ../Mind-Docker/vendor/ を見る
+node tools/gen-stdlib-dict.ts --dist linux-8 --archive <path>
+node tools/gen-stdlib-dict.ts --dist linux-8 --dir <展開した配布物>
 ```
 
-出力は `packages/mind-core/data/stdlib.json`。**生成物だがコミットする。**
+出力は `packages/mind-core/data/stdlib/<配布物>.json`。**生成物だがコミットする。**
+配布物ごとの置き場所と文字コードは `packages/mind-core/data/distributions.json` にある
+（0.1.0 から。Mind 9 for Windows の zip も同じ手順で読む）。
 これで拡張の利用者にも CI にも Mind の配布物は要らなくなる。
 
 ---

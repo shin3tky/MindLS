@@ -179,8 +179,8 @@ npm run package    # vsce package → dist/vscode-mind-<version>.vsix
 
 npm workspaces では `@mindls/language-server` が node_modules のシンボリックリンクになっていて、
 vsce はこれを .vsix に入れられません。そこで **esbuild で束ねてから包みます**。
-辞書はバンドルに含めず `stdlib.json` として隣に置き、Language Server が
-リンク → 隣のファイルの順で探します。
+辞書はバンドルに含めず、`distributions.json` と `stdlib/<配布物>.json` として隣に置き、
+Language Server がリンク → 隣のファイルの順で探します。
 
 できた .vsix は VS Code の拡張ビューの `…` → 「VSIX からのインストール」で入れられます。
 
@@ -210,7 +210,7 @@ npx vsce publish --packagePath dist/vscode-mind-0.0.3.vsix
 | `packages/vscode-mind/package.json` の `version` | 上げてあるか |
 | `CHANGELOG.md`（ルートと `packages/vscode-mind/`） | **2 つある。両方**に同じ内容が要る（.vsix に入るのは後者） |
 | `README.md`（ルートと `packages/vscode-mind/`） | 設定の既定値が実装と合っているか |
-| `npm run package` の出力 | `dist/` `syntaxes/` `icon.png` `readme.md` `changelog.md` `LICENSE.txt` の 12 ファイル |
+| `npm run package` の出力 | `dist/`（`distributions.json` と `stdlib/<配布物>.json` を含む）`syntaxes/` `icon.png` `readme.md` `changelog.md` `LICENSE.txt` の 14 ファイル |
 
 > **バージョンは `vsce publish patch` でも上げられます**が、これは `npm version` を呼ぶので
 > **コミットとタグが自動で増えます**。1 PR = 1 コミットにまとめたいときは、
@@ -287,6 +287,7 @@ Language Server は VS Code から UTF-8 のテキストを受け取るので、
 
 | 設定 | 既定 | 内容 |
 |---|---|---|
+| `mind.distribution` | `windows-9` | 使っている Mind の配布物（`windows-9` / `linux-8`）。標準単語の辞書と、文字コード設定コマンドの既定が切り替わる |
 | `mind.library` | `file` | リンクする標準ライブラリ |
 | `mind.diagnostics.undefinedWords` | `true` | 定義されていない単語を指摘する。`コンパイル` でつながるファイルは一緒に見る |
 | `mind.diagnostics.forwardReferences` | `true` | 定義より前での参照を指摘する |
@@ -305,18 +306,50 @@ Language Server は VS Code から UTF-8 のテキストを受け取るので、
 python3 tools/gen-icon.py
 ```
 
-## 標準単語辞書
+## 標準単語辞書と配布物の定義
 
-`packages/mind-core/data/stdlib.json` は Mind の配布物から生成したもので、
-**生成物ですがコミットしてあります**。拡張の利用者にも CI にも配布物は要りません。
+標準単語辞書は Mind の配布物ごとに 1 つあり、`mind.distribution` で選びます。
+
+| ファイル | 中身 |
+|---|---|
+| `packages/mind-core/data/distributions.json` | 配布物の定義（ID・別名・文字コード・アーカイブ名・**配布物の中の置き場所**） |
+| `packages/mind-core/data/stdlib/windows-9.json` | Mind 9 for Windows の辞書 |
+| `packages/mind-core/data/stdlib/linux-8.json` | Mind 8 for Linux の辞書 |
+
+辞書は配布物から生成したもので、**生成物ですがコミットしてあります**。
+拡張の利用者にも CI にも配布物は要りません。
 
 ```sh
-npm run gen:stdlib   # 再生成（Mind の配布物が要る。Docker は不要）
+# 配布物を vendor/ に置いてから（再配布しないので Git 管理外）
+#   vendor/mind-for-windows-9.04.zip
+#   vendor/mind-for-linux-8.0.08.tgz
+npm run gen:stdlib                                     # 見つかった配布物すべて
+node tools/gen-stdlib-dict.ts --dist windows-9         # 1 つだけ
+node tools/gen-stdlib-dict.ts --dist windows-9 --archive path/to/mind-for-windows-9.05.zip
+node tools/extract-samples.ts                          # 公式サンプルを fixtures/mind-samples/ に展開（テスト用）
 ```
 
-内訳は標準ライブラリ `pmind/file/*.src` とカーネル組み込み単語表
-`pmind/kernel/c_words*.wrd` の両方です。後者を入れないと `捨て` `複写` `真？` といった
-ごく普通の単語まで未定義に見えます。
+内訳は標準ライブラリ `file/*.src` とカーネル組み込み単語表 `kernel/c_words*.wrd` の両方です。
+後者を入れないと `捨て` `複写` `真？` といったごく普通の単語まで未定義に見えます。
+
+### 新しい版の配布物が出たら
+
+Mind は言語としては後方互換ですが、ライブラリの単語やソースの置き場所は版ごとに動きます
+（トップディレクトリは `pmind/` → `Mind9/`、`asmword.src` が取り込むカーネル単語表は
+`../kernelF/` → `../kernelK/`、文字コードは EUC-JP → Shift_JIS）。
+その差はコードではなく `distributions.json` に寄せてあります。
+
+1. **同じ系列の改訂版**（9.04 → 9.05 など）: `vendor/` に置いて `npm run gen:stdlib` するだけです。
+   アーカイブ名はパターン（`mind-for-windows-9.*.zip`）で探し、版のいちばん新しいものを使います
+2. **中の置き場所が変わった**: `layout` のパターンを直します。配布物のルートは
+   `marker`（`file/asmword.src` など）を含むいちばん浅いディレクトリとして探すので、
+   トップディレクトリの名前が変わっただけなら直さなくて構いません。パターンは和集合で展開するので、
+   新旧の場所を両方並べておいても害はありません
+3. **新しい系列**（Mind 10 など）: `distributions` に 1 項目足し、`package.json` の
+   `mind.distribution` の `enum` に加えます
+
+`npm test` は、定義にあるすべての配布物に辞書がそろっていること、展開したサンプルがあれば
+既定の診断がそれらに対して黙っていることを確かめます。
 
 実処理系を動かしたい場合は [Mind-Docker](https://github.com/shin3tky/Mind-Docker) を使います。
 

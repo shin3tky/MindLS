@@ -1,62 +1,99 @@
 /**
- * 配布物から公式サンプル（pmind/sample, pmind/sampleF）を取り出し、
- * UTF-8 に変換して fixtures/mind-samples/ に置く。
+ * 配布物から公式サンプルと標準ライブラリのソースを取り出し、UTF-8 に変換して
+ * fixtures/mind-samples/<配布物>/ に置く。
  *
- * 文法の広めのスモークテストに使う。再配布はしないので出力は Git 管理外。
+ * 文法の広めのスモークテストと、既定の診断が誤検出しないことの確認に使う。
+ * 再配布はしないので出力は Git 管理外。どこから何を取るかは
+ * packages/mind-core/data/distributions.json の layout に従う。
  *
- *   node tools/extract-samples.ts
- *   node tools/extract-samples.ts --tgz path/to/mind-for-linux-8.0.08.tgz
+ *   fixtures/mind-samples/<配布物>/
+ *     samples/    完結したプログラム（layout.samples）。診断ゼロを守る
+ *     stdlib/     標準ライブラリ（layout.libraries.file）。診断ゼロを守り、辞書とも突き合わせる
+ *     fragments/  取り込まれる側のソース（layout.fragments）。構文だけを検査する
+ *     gui/        辞書を持たないライブラリを使うサンプル（layout.guiSamples）。構文だけを検査する
+ *     errors/     わざと誤りを入れた教材（layout.errorSamples）。エラーになることを検査する
+ *
+ *   node tools/extract-samples.ts                    … 定義にある配布物すべて（見つからないものは飛ばす）
+ *   node tools/extract-samples.ts --dist windows-9
+ *   node tools/extract-samples.ts --dist linux-8 --archive path/to/mind-for-linux-8.0.08.tgz
  */
 
-import { execFileSync } from 'node:child_process';
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
-import { dirname, join, resolve } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { mkdirSync, rmSync, writeFileSync } from 'node:fs';
+import { join } from 'node:path';
 
-const REPO = resolve(dirname(fileURLToPath(import.meta.url)), '..');
-const DEFAULT_TGZ = resolve(REPO, '../Mind-Docker/vendor/mind-for-linux-8.0.08.tgz');
-const OUT_DIR = resolve(REPO, 'fixtures/mind-samples');
+import {
+  REPO,
+  expand,
+  loadManifest,
+  openDistribution,
+  parseDistArgs,
+  readSource,
+  targetDistributions,
+  type OpenedDistribution,
+} from './lib/mind-dist.ts';
 
-const tgzArg = process.argv.indexOf('--tgz');
-const tgz = resolve(tgzArg >= 0 ? (process.argv[tgzArg + 1] ?? DEFAULT_TGZ) : DEFAULT_TGZ);
+const OUT_ROOT = join(REPO, 'fixtures/mind-samples');
 
-if (!existsSync(tgz)) {
-  console.error(`配布物が見つかりません: ${tgz}`);
-  console.error('--tgz で場所を指定してください。');
-  process.exit(1);
-}
+/** ファイル名に使えない文字を落とす（sampleF には日本語のファイル名がある） */
+const stem = (name: string): string => name.replace(/\.src$/i, '').replace(/[^\p{L}\p{N}_-]/gu, '_');
 
-const work = mkdtempSync(join(tmpdir(), 'mind-samples-'));
-try {
-  execFileSync('tar', ['xzf', tgz, '-C', work], { stdio: ['ignore', 'ignore', 'pipe'] });
+function extract(dist: OpenedDistribution): number {
+  const { layout, encoding } = dist.spec;
+  const out = join(OUT_ROOT, dist.id);
+  rmSync(out, { recursive: true, force: true });
 
-  mkdirSync(OUT_DIR, { recursive: true });
-  const decoder = new TextDecoder('euc-jp');
+  const buckets: [string, Readonly<Record<string, readonly string[]>>][] = [
+    ['samples', layout.samples],
+    ['stdlib', { file: layout.libraries['file'] ?? [] }],
+    ['fragments', layout.fragments],
+    ['gui', layout.guiSamples],
+    ['errors', layout.errorSamples],
+  ];
+
   let count = 0;
-
-  for (const sub of ['sample', 'sampleF', 'file']) {
-    const dir = join(work, 'pmind', sub);
-    if (!existsSync(dir)) continue;
-    const outDir = sub === 'file' ? join(OUT_DIR, 'stdlib') : OUT_DIR;
-    mkdirSync(outDir, { recursive: true });
-    // sampleF のファイル名自体が EUC-JP のことがある。
-    // 文字列で受け取ると開き直せなくなるので、バイト列のまま扱う。
-    for (const nameBuf of readdirSync(dir, { encoding: 'buffer' })) {
-      const decodedName = decoder.decode(nameBuf);
-      if (!decodedName.endsWith('.src')) continue;
-
-      const fullPath = Buffer.concat([Buffer.from(`${dir}/`), nameBuf]);
-      const text = decoder.decode(readFileSync(fullPath));
-
-      const stem = decodedName.slice(0, -4).replace(/[^\p{L}\p{N}_-]/gu, '_');
-      const out = sub === 'file' ? `${stem}.src` : `${sub}-${String(++count).padStart(2, '0')}-${stem}.src`;
-      if (sub === 'file') count++;
-      writeFileSync(join(outDir, out), text, 'utf8');
+  for (const [bucket, groups] of buckets) {
+    for (const [group, patterns] of Object.entries(groups)) {
+      const exclude = bucket === 'samples' ? layout.exclude : [];
+      const files = expand(dist.root, patterns, encoding, exclude);
+      if (files.length === 0) continue;
+      const dir = join(out, bucket);
+      mkdirSync(dir, { recursive: true });
+      for (const f of files) {
+        // 標準ライブラリはファイル名そのまま（辞書の出典と突き合わせるため）
+        const name = bucket === 'stdlib' ? `${stem(f.name)}.src` : `${group}-${stem(f.name)}.src`;
+        // 改行はそのまま残す（Windows 版は CRLF）。エディタから届くのも CRLF なので、その経路も試す
+        writeFileSync(join(dir, name), readSource(f, encoding), 'utf8');
+        count++;
+      }
     }
   }
-
-  console.log(`${count} 本のソースを ${OUT_DIR} に展開しました（UTF-8。標準ライブラリは stdlib/ 配下）`);
-} finally {
-  rmSync(work, { recursive: true, force: true });
+  console.log(`[${dist.id}] ${String(count)} 本のソースを ${out} に展開しました（UTF-8）`);
+  return count;
 }
+
+function main(): void {
+  const manifest = loadManifest();
+  const args = parseDistArgs(process.argv.slice(2));
+  const explicit = args.dists.length > 0;
+  let total = 0;
+  for (const id of targetDistributions(manifest, args)) {
+    const dist = openDistribution(manifest, id, args);
+    if (dist === null) {
+      const msg = `[${id}] 配布物が見つかりません（vendor/ に置くか、--archive で指定）`;
+      if (explicit) {
+        console.error(msg);
+        process.exit(1);
+      }
+      console.warn(msg + ' — 飛ばします');
+      continue;
+    }
+    try {
+      total += extract(dist);
+    } finally {
+      dist.cleanup();
+    }
+  }
+  if (total === 0) process.exit(1);
+}
+
+main();

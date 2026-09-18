@@ -1,43 +1,54 @@
 /**
- * 標準単語辞書 stdlib.json を生成する。
+ * 標準単語辞書 `packages/mind-core/data/stdlib/<配布物>.json` を生成する。
  *
- * Mind の配布物には標準ライブラリのソース（pmind/file/*.src）が同梱されている。
+ * Mind の配布物には標準ライブラリのソース（`file/*.src`）が同梱されている。
  * `.sym` はバイナリで読めないが、こちらは読めるので、定義行とスタック仕様コメントを
  * 抽出して辞書にする。処理系と食い違わない辞書がこれで作れる。
  *
- * Docker は要らない。配布物の tgz から直接取り出す。
+ * 配布物は版ごとに置き場所も文字コードも違う（`pmind/file` + EUC-JP、
+ * `Mind9/file` + Shift_JIS …）。その差は `packages/mind-core/data/distributions.json`
+ * に書いてあり、このツールはそれに従うだけ。新しい版で置き場所が変わったら、
+ * コードではなく定義の `layout` を直す。配布物は vendor/ に置けば自動で見つける
+ * （同じ系列で複数あれば版の新しいもの）。Docker は要らない。
  *
  * カーネル組み込み単語（`捨て` `複写` `真？` など）はライブラリソースには無い。
- * これらは `pmind/kernel/c_words*.wrd` に
+ * これらは `kernel/c_words*.wrd` に
  *   `複写は　アセンブラ定義の処理単語。`
- * の形で並んでいて、`asmword.src` が `"../kernelF/c_words.wrd"を コンパイルする。`
- * として取り込んでいる。つまり配布物の中では .wrd もライブラリソースの一部なので、
- * こちらも同じパーサに通して辞書に入れる。これを入れないと、ごく普通のプログラムでも
- * 未定義単語だらけに見えてしまう。
+ * の形で並んでいて、`asmword.src` が `"../kernelK/c_words.wrd"を コンパイルする。`
+ * として取り込んでいる（Mind 8 では `../kernelF/`）。つまり配布物の中では .wrd も
+ * ライブラリソースの一部なので、こちらも同じパーサに通して辞書に入れる。
  *
  * 抽出には mind-core のレキサ／パーサをそのまま使う。独自の正規表現を持つと
  * 解析器と辞書がずれる（実際、regex 版は `（…）` コメントを取りこぼしていた）。
  *
- *   node tools/gen-stdlib-dict.ts
- *   node tools/gen-stdlib-dict.ts --tgz path/to/mind-for-linux-8.0.08.tgz
- *   node tools/gen-stdlib-dict.ts --dir path/to/pmind/file
+ *   node tools/gen-stdlib-dict.ts                         … 定義にある配布物すべて（見つからないものは飛ばす）
+ *   node tools/gen-stdlib-dict.ts --dist windows-9
+ *   node tools/gen-stdlib-dict.ts --dist windows-9 --archive path/to/mind-for-windows-9.05.zip
+ *   node tools/gen-stdlib-dict.ts --dist linux-8 --dir path/to/pmind
  *
- * 出力: packages/mind-core/data/stdlib.json（生成物だがコミットする。
+ * 出力: packages/mind-core/data/stdlib/<配布物>.json（生成物だがコミットする。
  *       これにより拡張の利用者にも CI にも Mind の配布物は不要になる）
  */
 
-import { execFileSync } from 'node:child_process';
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
-import { dirname, join, resolve } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { mkdirSync, writeFileSync } from 'node:fs';
+import { basename, join } from 'node:path';
 
 import { parse } from '../packages/mind-core/src/parser.ts';
+import {
+  REPO,
+  expand,
+  loadManifest,
+  openDistribution,
+  parseDistArgs,
+  readSource,
+  targetDistributions,
+  type OpenedDistribution,
+} from './lib/mind-dist.ts';
 
-const HERE = dirname(fileURLToPath(import.meta.url));
-const REPO = resolve(HERE, '..');
-const DEFAULT_TGZ = resolve(REPO, '../Mind-Docker/vendor/mind-for-linux-8.0.08.tgz');
-const OUT = resolve(REPO, 'packages/mind-core/data/stdlib.json');
+const OUT_DIR = join(REPO, 'packages/mind-core/data/stdlib');
+
+/** 辞書にするライブラリ。`mind.library` の既定値 */
+const LIBRARY = 'file';
 
 export interface WordEntry {
   name: string;
@@ -54,38 +65,6 @@ export interface WordEntry {
   forwardDeclared?: boolean;
   file: string;
   line: number;
-}
-
-function parseArgs(argv: string[]) {
-  const out: { tgz?: string; dir?: string } = {};
-  for (let i = 0; i < argv.length; i++) {
-    if (argv[i] === '--tgz') out.tgz = argv[++i];
-    else if (argv[i] === '--dir') out.dir = argv[++i];
-  }
-  return out;
-}
-
-const FILE_GLOB = 'pmind/file/*.src';
-const KERNEL_GLOB = 'pmind/kernel/c_words*.wrd';
-
-/** 配布物から標準ライブラリとカーネル単語表を取り出して一時ディレクトリを返す */
-function extractFromTgz(tgzPath: string): { dir: string; cleanup: () => void } {
-  if (!existsSync(tgzPath)) {
-    console.error(`配布物が見つかりません: ${tgzPath}`);
-    console.error('Mind-Docker の vendor/ に配布物を置くか、--tgz / --dir で場所を指定してください。');
-    process.exit(1);
-  }
-  const dir = mkdtempSync(join(tmpdir(), 'mind-stdlib-'));
-  try {
-    execFileSync('tar', ['xzf', tgzPath, '-C', dir, '--wildcards', FILE_GLOB, KERNEL_GLOB], {
-      stdio: ['ignore', 'ignore', 'pipe'],
-    });
-  } catch {
-    rmSync(dir, { recursive: true, force: true });
-    console.error(`配布物から ${FILE_GLOB} / ${KERNEL_GLOB} を取り出せませんでした: ${tgzPath}`);
-    process.exit(1);
-  }
-  return { dir: join(dir, 'pmind'), cleanup: () => rmSync(dir, { recursive: true, force: true }) };
 }
 
 /**
@@ -163,13 +142,6 @@ function mergeForwardDeclarations(entries: WordEntry[]): WordEntry[] {
   return out;
 }
 
-function listing(dir: string, ext: string): string[] {
-  if (!existsSync(dir)) return [];
-  return readdirSync(dir)
-    .filter((f) => f.endsWith(ext))
-    .sort();
-}
-
 /**
  * カーネル単語表は c_words / c_words2 / c_wordsg の 3 つがあり、大半が同じ語である。
  * 正規形が同じものは 1 つに畳む（代表は最初に現れたもの）。
@@ -191,70 +163,93 @@ function dedupe(entries: WordEntry[]): WordEntry[] {
   return out;
 }
 
-function main(): void {
-  const args = parseArgs(process.argv.slice(2));
-  let root: string;
-  let cleanup = () => {};
-  let origin: string;
+function generate(dist: OpenedDistribution): void {
+  const { spec } = dist;
+  const libraryPatterns = spec.layout.libraries[LIBRARY];
+  if (libraryPatterns === undefined) {
+    throw new Error(`${dist.id}: layout.libraries.${LIBRARY} が定義されていません`);
+  }
+  const groups: { source: 'file' | 'kernel'; patterns: readonly string[] }[] = [
+    { source: 'file', patterns: libraryPatterns },
+    { source: 'kernel', patterns: spec.layout.kernelWords },
+  ];
 
-  if (args.dir) {
-    root = resolve(args.dir);
-    origin = root;
-  } else {
-    const tgz = resolve(args.tgz ?? DEFAULT_TGZ);
-    const ex = extractFromTgz(tgz);
-    root = ex.dir;
-    cleanup = ex.cleanup;
-    origin = tgz;
+  const raw: WordEntry[] = [];
+  let fileCount = 0;
+  for (const group of groups) {
+    const files = expand(dist.root, group.patterns, spec.encoding);
+    if (files.length === 0) {
+      throw new Error(
+        `${dist.id}: ${group.patterns.join(', ')} に当たるファイルがありません。` +
+          '配布物の中の置き場所が変わったなら distributions.json の layout を直してください。',
+      );
+    }
+    fileCount += files.length;
+    for (const f of files) raw.push(...parseFile(f.name, group.source, readSource(f, spec.encoding)));
   }
 
-  try {
-    const decoder = new TextDecoder('euc-jp');
-    const sources: { source: 'file' | 'kernel'; dir: string; files: string[] }[] = [
-      { source: 'file', dir: join(root, 'file'), files: listing(join(root, 'file'), '.src') },
-      { source: 'kernel', dir: join(root, 'kernel'), files: listing(join(root, 'kernel'), '.wrd') },
-    ];
+  const words = dedupe(mergeForwardDeclarations(raw));
+  const archiveName = dist.archive === null ? basename(dist.root) : basename(dist.archive);
 
-    const raw: WordEntry[] = [];
-    for (const group of sources) {
-      for (const f of group.files) {
-        const text = decoder.decode(readFileSync(join(group.dir, f)));
-        raw.push(...parseFile(f, group.source, text));
+  const doc = {
+    generatedBy: 'tools/gen-stdlib-dict.ts',
+    generatedAt: new Date().toISOString().slice(0, 10),
+    source: {
+      distribution: dist.id,
+      label: spec.label,
+      version: dist.version,
+      library: LIBRARY,
+      origin: archiveName,
+      files: fileCount,
+    },
+    counts: {
+      total: words.length,
+      global: words.filter((w) => w.scope === 'global').length,
+      local: words.filter((w) => w.scope === 'local').length,
+      fromFile: words.filter((w) => w.source === 'file').length,
+      fromKernel: words.filter((w) => w.source === 'kernel').length,
+    },
+    words,
+  };
+
+  mkdirSync(OUT_DIR, { recursive: true });
+  const out = join(OUT_DIR, `${dist.id}.json`);
+  writeFileSync(out, JSON.stringify(doc, null, 2) + '\n', 'utf8');
+
+  console.log(`[${dist.id}] ${archiveName}: ${fileCount} ファイルから ${words.length} 語を抽出しました`);
+  console.log(`  global ${doc.counts.global} / local ${doc.counts.local}`);
+  console.log(`  library ${doc.counts.fromFile} / kernel ${doc.counts.fromKernel}`);
+  console.log(`  -> ${out}`);
+}
+
+function main(): void {
+  const manifest = loadManifest();
+  const args = parseDistArgs(process.argv.slice(2));
+  const explicit = args.dists.length > 0;
+  const ids = targetDistributions(manifest, args);
+
+  let generated = 0;
+  for (const id of ids) {
+    const dist = openDistribution(manifest, id, args);
+    if (dist === null) {
+      const msg = `[${id}] 配布物が見つかりません（vendor/ に ${manifest.distributions[id]!.archive.join(' / ')} を置くか、--archive で指定）`;
+      if (explicit) {
+        console.error(msg);
+        process.exit(1);
       }
+      console.warn(msg + ' — 飛ばします');
+      continue;
     }
-
-    const words = dedupe(mergeForwardDeclarations(raw));
-    const fileCount = sources.reduce((n, g) => n + g.files.length, 0);
-
-    const doc = {
-      generatedBy: 'tools/gen-stdlib-dict.ts',
-      generatedAt: new Date().toISOString().slice(0, 10),
-      source: {
-        distribution: 'mind-for-linux-8.0.08',
-        library: 'file',
-        origin: origin.replace(/^.*\//, ''),
-        files: fileCount,
-      },
-      counts: {
-        total: words.length,
-        global: words.filter((w) => w.scope === 'global').length,
-        local: words.filter((w) => w.scope === 'local').length,
-        fromFile: words.filter((w) => w.source === 'file').length,
-        fromKernel: words.filter((w) => w.source === 'kernel').length,
-      },
-      words,
-    };
-
-    mkdirSync(dirname(OUT), { recursive: true });
-    writeFileSync(OUT, JSON.stringify(doc, null, 2) + '\n', 'utf8');
-
-    const files = { length: fileCount };
-    console.log(`${files.length} ファイルから ${words.length} 語を抽出しました`);
-    console.log(`  global ${doc.counts.global} / local ${doc.counts.local}`);
-    console.log(`  library ${doc.counts.fromFile} / kernel ${doc.counts.fromKernel}`);
-    console.log(`  -> ${OUT}`);
-  } finally {
-    cleanup();
+    try {
+      generate(dist);
+      generated++;
+    } finally {
+      dist.cleanup();
+    }
+  }
+  if (generated === 0) {
+    console.error('辞書を 1 つも生成できませんでした。');
+    process.exit(1);
   }
 }
 

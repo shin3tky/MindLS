@@ -50,7 +50,11 @@ export function hoverAt(ctx: HoverContext): HoverInfo | null {
 
   const out = [heading(std.name, std.kind, std.attrs)];
   if (std.stack !== null) out.push('', '```', std.stack, '```');
-  out.push('', '標準ライブラリ ' + (ctx.stdlib?.library ?? '') + ' — `' + std.file + ':' + String(std.line) + '`');
+  const origin = ctx.stdlib?.origin ? `（${ctx.stdlib.origin}）` : '';
+  out.push(
+    '',
+    '標準ライブラリ ' + (ctx.stdlib?.library ?? '') + origin + ' — `' + std.file + ':' + String(std.line) + '`',
+  );
   return { contents: out.join('\n'), range: token.range };
 }
 

@@ -31,6 +31,10 @@
 >   **未定義単語の診断を既定で有効**にした（549 件 green）。v0.0.2 を公開。
 > - 2026-09-18 サンプル `examples/kidoairaku.src`（喜怒哀楽ライフゲーム）を書いて実コンパイラで動かしたところ、
 >   配列の `要素数` を未定義単語と誤報告していたので予約語表に加えた（551 件 green）。v0.0.3。
+> - 2026-09-18 **Mind 9 for Windows（9.04）対応**。配布物ごとの差を `data/distributions.json` に寄せ、
+>   辞書を配布物別（`data/stdlib/windows-9.json` / `linux-8.json`）にして `mind.distribution` で切り替える
+>   （既定 `windows-9`）。Mind 9 のコーパスで見つかった解析の取り違え（定義の中の条件コンパイル、
+>   構造体の局所宣言、`”…”` の文字列など）を直した（公式コーパスを展開した状態で 1,066 件 green）。v0.1.0。
 >
 > 数字は書いた時点のもの。現在値は各節を参照。
 
@@ -846,8 +850,8 @@ docker run --rm --platform linux/amd64 \
 **Mind 本体は再配布しない**（`vendor/*.tgz` は `.gitignore` 済み）。
 公式サンプルと標準ライブラリは `tools/extract-samples.ts` で配布物から展開する
 `fixtures/mind-samples/`（Git 管理外）に置き、テストは無ければ skip する。
-辞書（`data/stdlib.json`）は配布物から**抽出した事実**であって配布物そのものではないので、
-生成物としてコミットしている。
+辞書（`data/stdlib/<配布物>.json`）は配布物から**抽出した事実**であって配布物そのものではないので、
+生成物としてコミットしている。配布物ごとの置き場所の違いは `data/distributions.json` に寄せてある。
 
 ---
 

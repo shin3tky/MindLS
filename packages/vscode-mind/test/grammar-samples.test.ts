@@ -13,7 +13,16 @@ import { tokenize } from './helpers/tokenize.ts';
  * `node tools/extract-samples.ts` で展開したときだけ走る。
  */
 const SAMPLES = join(dirname(fileURLToPath(import.meta.url)), '..', '..', '..', 'fixtures', 'mind-samples');
-const files = existsSync(SAMPLES) ? readdirSync(SAMPLES).filter((f) => f.endsWith('.src')) : [];
+
+/** `fixtures/mind-samples/<配布物>/{samples,gui}/*.src` */
+const files: string[] = [];
+for (const dist of existsSync(SAMPLES) ? readdirSync(SAMPLES) : []) {
+  for (const bucket of ['samples', 'gui']) {
+    const dir = join(SAMPLES, dist, bucket);
+    if (!existsSync(dir)) continue;
+    for (const f of readdirSync(dir)) if (f.endsWith('.src')) files.push(join(dist, bucket, f));
+  }
+}
 
 describe.skipIf(files.length === 0)('公式サンプル', () => {
   it.each(files)('%s の着色が崩れない', async (name) => {

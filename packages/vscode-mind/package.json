@@ -2,7 +2,7 @@
   "name": "vscode-mind",
   "displayName": "Mind (日本語プログラミング言語)",
   "description": "日本語プログラミング言語 Mind の構文ハイライトと Language Server",
-  "version": "0.0.3",
+  "version": "0.1.0",
   "publisher": "shin3tky",
   "icon": "icon.png",
   "repository": {
@@ -77,6 +77,19 @@
     "configuration": {
       "title": "Mind",
       "properties": {
+        "mind.distribution": {
+          "type": "string",
+          "default": "windows-9",
+          "enum": [
+            "windows-9",
+            "linux-8"
+          ],
+          "enumDescriptions": [
+            "Mind 9 for Windows（Shift_JIS）の標準ライブラリ",
+            "Mind 8 for Linux（EUC-JP）の標準ライブラリ"
+          ],
+          "markdownDescription": "使っている Mind の配布物。補完・ホバー・未定義単語の診断に使う標準単語辞書と、`Mind: このワークスペースの文字コードと関連付けを設定する` の既定の文字コードが切り替わる。"
+        },
         "mind.library": {
           "type": "string",
           "default": "file",

@@ -19,8 +19,9 @@ import {
 } from 'vscode-languageserver/node';
 import type { TextDocument } from 'vscode-languageserver-textdocument';
 
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
+import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import {
@@ -30,14 +31,17 @@ import {
   documentSymbols,
   EMPTY_STDLIB,
   parse,
+  resolveDistribution,
 } from '@mindls/core';
 import type {
   AnalyzeOptions,
   CompletionItem as CoreCompletionItem,
+  DistributionManifest,
   DocumentSymbolNode,
   HoverInfo,
   ParseResult,
   Range,
+  ResolvedDistribution,
   StdlibDocument,
   StdlibIndex,
   SymbolTable,
@@ -176,49 +180,83 @@ export function toDocumentSymbols(parsed: ParseResult): DocumentSymbol[] {
 // --- 標準単語辞書 ------------------------------------------------------------
 
 /**
- * 標準単語辞書を読み込む。配布物から生成してコミットしてあるものなので、
- * Mind の配布物も Docker も要らない。
- */
-/**
- * 標準単語辞書の置き場所の候補。
+ * 辞書と配布物の定義の置き場所の候補。中身は次の 2 つ。
  *
- * 開発中は npm workspaces のリンク越しに `@mindls/core/stdlib` が引ける。
+ *   distributions.json      配布物の定義（既定の配布物・別名）
+ *   stdlib/<配布物>.json     配布物ごとの標準単語辞書
+ *
+ * 開発中は npm workspaces のリンク越しに `@mindls/core/distributions` が引ける。
  * 配布する .vsix では esbuild が 1 ファイルに束ねてしまうのでリンクは無く、
- * かわりに `stdlib.json` をバンドルの隣に置いてある。両方を順に試す。
+ * かわりに同じ構成をバンドルの隣に置いてある。両方を順に試す。
+ * `MINDLS_DATA_DIR` で差し替えられる（テスト・手元での辞書の確認用）。
  */
-function stdlibCandidates(): string[] {
+function dataDirCandidates(): string[] {
   const out: string[] = [];
-  const override = process.env['MINDLS_STDLIB'];
+  const override = process.env['MINDLS_DATA_DIR'];
   if (override !== undefined && override !== '') out.push(override);
   try {
-    out.push(fileURLToPath(new URL('stdlib.json', import.meta.url)));
+    out.push(dirname(fileURLToPath(import.meta.url)));
   } catch {
     /* バンドルされていない場合は次を試す */
   }
   try {
-    out.push(createRequire(import.meta.url).resolve('@mindls/core/stdlib'));
+    out.push(dirname(createRequire(import.meta.url).resolve('@mindls/core/distributions')));
   } catch {
     /* リンクが無い場合は次を試す */
   }
   return out;
 }
 
-function loadStdlib(): StdlibIndex {
-  for (const path of stdlibCandidates()) {
+let dataDirCache: { dir: string; manifest: DistributionManifest } | null | undefined;
+
+/** 配布物の定義が読める最初の置き場所 */
+function dataDir(): { dir: string; manifest: DistributionManifest } | null {
+  if (dataDirCache !== undefined) return dataDirCache;
+  dataDirCache = null;
+  for (const dir of dataDirCandidates()) {
+    const path = join(dir, 'distributions.json');
+    if (!existsSync(path)) continue;
     try {
-      return createStdlibIndex(JSON.parse(readFileSync(path, 'utf8')) as StdlibDocument);
+      dataDirCache = { dir, manifest: JSON.parse(readFileSync(path, 'utf8')) as DistributionManifest };
+      break;
     } catch {
       continue;
     }
   }
-  return EMPTY_STDLIB;
+  return dataDirCache;
 }
 
-let stdlibCache: StdlibIndex | undefined;
+/**
+ * 設定 `mind.distribution` の値から配布物を決める。定義が読めなければ null。
+ * 未知の値は既定に倒れ、`fellBack` が立つ。
+ */
+export function resolveDistributionSetting(requested: string | null | undefined): ResolvedDistribution | null {
+  const data = dataDir();
+  return data === null ? null : resolveDistribution(data.manifest, requested);
+}
 
-export function stdlib(): StdlibIndex {
-  stdlibCache ??= loadStdlib();
-  return stdlibCache;
+const stdlibCache = new Map<string, StdlibIndex>();
+
+/**
+ * 標準単語辞書。配布物ごとに生成してコミットしてあるものなので、
+ * Mind の配布物も Docker も要らない。`requested` は `mind.distribution` の値。
+ */
+export function stdlib(requested?: string | null): StdlibIndex {
+  const data = dataDir();
+  if (data === null) return EMPTY_STDLIB;
+  const { id } = resolveDistribution(data.manifest, requested);
+  const cached = stdlibCache.get(id);
+  if (cached !== undefined) return cached;
+
+  let index = EMPTY_STDLIB;
+  try {
+    const doc = JSON.parse(readFileSync(join(data.dir, 'stdlib', `${id}.json`), 'utf8')) as StdlibDocument;
+    index = createStdlibIndex(doc);
+  } catch {
+    /* 辞書が無ければ空のまま。未定義単語の診断は辞書が空だと黙る */
+  }
+  stdlibCache.set(id, index);
+  return index;
 }
 
 // --- 補完・ホバーの変換 ------------------------------------------------------

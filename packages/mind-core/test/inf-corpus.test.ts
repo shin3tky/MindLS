@@ -1,5 +1,4 @@
 import { existsSync, readFileSync, readdirSync } from 'node:fs';
-import { createRequire } from 'node:module';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -7,9 +6,8 @@ import { describe, expect, it } from 'vitest';
 
 import { analyze } from '../src/diagnostics.ts';
 import { parse } from '../src/parser.ts';
-import { createStdlibIndex } from '../src/stdlib.ts';
-import type { StdlibDocument } from '../src/stdlib.ts';
 import { buildSymbolTable } from '../src/symbols.ts';
+import { loadStdlib } from './helpers/stdlib.ts';
 
 /**
  * 実コンパイラとの答え合わせ。
@@ -27,9 +25,8 @@ const REPO = join(dirname(fileURLToPath(import.meta.url)), '..', '..', '..');
 const CORPUS = join(REPO, 'fixtures', 'inf-corpus');
 const COLLECTED = join(CORPUS, 'collected');
 
-const stdlib = createStdlibIndex(
-  createRequire(import.meta.url)('../data/stdlib.json') as StdlibDocument,
-);
+// 実コンパイラ（Mind 8 for Linux の Docker）で集めた結果なので、辞書も同じ配布物のもの
+const stdlib = loadStdlib('linux-8');
 
 interface Sample {
   readonly name: string;

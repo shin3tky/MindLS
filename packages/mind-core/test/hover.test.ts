@@ -1,16 +1,11 @@
-import { createRequire } from 'node:module';
-
 import { describe, expect, it } from 'vitest';
 
 import { hoverAt } from '../src/hover.ts';
 import { parse } from '../src/parser.ts';
-import { createStdlibIndex } from '../src/stdlib.ts';
 import { buildSymbolTable } from '../src/symbols.ts';
-import type { StdlibDocument } from '../src/stdlib.ts';
+import { loadStdlib } from './helpers/stdlib.ts';
 
-const stdlib = createStdlibIndex(
-  createRequire(import.meta.url)('../data/stdlib.json') as StdlibDocument,
-);
+const stdlib = loadStdlib();
 
 const hover = (src: string, line: number, character: number) => {
   const parsed = parse(src);

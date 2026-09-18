@@ -13,6 +13,9 @@
       "include": "#string-double"
     },
     {
+      "include": "#string-fullwidth"
+    },
+    {
       "include": "#character"
     },
     {
@@ -79,6 +82,29 @@
       "patterns": [
         {
           "include": "#string-escape"
+        }
+      ]
+    },
+    "string-fullwidth": {
+      "comment": "『』、“”、全角の二重引用符（Shift_JIS の ” は開きも閉じも同じ字で書かれる）",
+      "patterns": [
+        {
+          "name": "string.quoted.japanese.mind",
+          "begin": "『",
+          "end": "』",
+          "patterns": [{ "include": "#string-escape" }]
+        },
+        {
+          "name": "string.quoted.double.mind",
+          "begin": "[“”]",
+          "end": "”",
+          "patterns": [{ "include": "#string-escape" }]
+        },
+        {
+          "name": "string.quoted.double.mind",
+          "begin": "＂",
+          "end": "＂",
+          "patterns": [{ "include": "#string-escape" }]
         }
       ]
     },

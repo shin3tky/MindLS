@@ -179,10 +179,12 @@ describe('Language Server（実プロセス）', () => {
 
     expect(hover?.contents.value).toContain('**一行表示**');
     expect(hover?.contents.value).toContain('標準ライブラリ file');
+    // 既定の配布物は Mind 9 for Windows
+    expect(hover?.contents.value).toContain('Mind 9 for Windows');
   }, 20_000);
 
   it('公式サンプルでも定義ジャンプが効く', async () => {
-    const path = join(REPO, 'fixtures', 'mind-samples', 'sample-05-revline.src');
+    const path = join(REPO, 'fixtures', 'mind-samples', 'windows-9', 'samples', 'sample-revline.src');
     let text: string;
     try {
       text = readFileSync(path, 'utf8');
@@ -254,6 +256,47 @@ describe('診断の配線（実プロセス）', () => {
     expect(codesOf(params)).not.toContain('forward-reference');
     await client.dispose();
   }, 20_000);
+
+  describe('mind.distribution で辞書を切り替える', () => {
+    // Windows 版の file ライブラリ（fwinAPI.src）にだけある語
+    const WIN_ONLY = 'メインとは\n　Ｗｉｎｄｏｗｓディレクトリを　表示すること。';
+
+    it('既定（windows-9）では Windows 版の語を知っている', async () => {
+      const client = new LspClient();
+      await client.initialize();
+      client.openDocument('file:///tmp/dist-default.src', WIN_ONLY);
+      expect(codesOf(await client.waitForNotification('textDocument/publishDiagnostics'))).not.toContain(
+        'undefined-word',
+      );
+      await client.dispose();
+    }, 20_000);
+
+    it('linux-8 では Windows 版の語は未定義になり、設定変更で戻せる', async () => {
+      const client = new LspClient();
+      await client.initialize({ distribution: 'linux-8' });
+      const uri = 'file:///tmp/dist-linux.src';
+      client.openDocument(uri, WIN_ONLY);
+      expect(codesOf(await client.waitForNotification('textDocument/publishDiagnostics'))).toContain(
+        'undefined-word',
+      );
+      await new Promise((r) => setTimeout(r, 50));
+      client.drainNotifications('textDocument/publishDiagnostics');
+      client.notify('workspace/didChangeConfiguration', { settings: { mind: { distribution: 'windows' } } });
+      expect(codesOf(await client.waitForNotification('textDocument/publishDiagnostics'))).not.toContain(
+        'undefined-word',
+      );
+      await client.dispose();
+    }, 20_000);
+
+    it('知らない配布物は既定に倒して知らせる', async () => {
+      const client = new LspClient();
+      await client.initialize({ distribution: 'mac-10' });
+      const message = (await client.waitForNotification('window/showMessage')) as { message: string };
+      expect(message.message).toContain('mac-10');
+      expect(message.message).toContain('windows-9');
+      await client.dispose();
+    }, 20_000);
+  });
 });
 
 describe('Semantic Tokens（実プロセス）', () => {

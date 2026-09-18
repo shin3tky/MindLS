@@ -51,6 +51,14 @@ describe('リテラル', () => {
     expect(await hasScope('起動コマンドは　文字列定数　"dir /w"。', 'dir /w', 'string.quoted.double')).toBe(true);
   });
 
+  it.each([
+    ['『』', '　『こんにちは』を　表示する。', 'こんにちは', 'string.quoted.japanese'],
+    ['“”', '　“こんにちは”を　表示する。', 'こんにちは', 'string.quoted.double'],
+    ['”” (Shift_JIS)', '　”b: 実行”続', 'b: 実行', 'string.quoted.double'],
+  ])('%s の文字列', async (_label, src, text, scope) => {
+    expect(await hasScope(src, text, scope)).toBe(true);
+  });
+
   it('文字定数', async () => {
     expect(await hasScope("　'A'を　一文字表示し", "'A'", 'constant.character')).toBe(true);
   });

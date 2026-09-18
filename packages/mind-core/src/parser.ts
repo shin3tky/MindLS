@@ -16,6 +16,7 @@ import {
   blockRoleOf,
   DECLARATION_KEYWORDS,
   DEFINITION_KEYWORDS,
+  STRUCT_KEYWORDS,
   TEMPLATE_KIND,
   TEMPLATE_MEMBER_KIND,
   VISIBILITY_GLOBAL,
@@ -201,7 +202,7 @@ export function parse(source: string): ParseResult {
       t.range.start.character === 0 &&
       (t.particle === 'とは' || t.particle === 'は')
     ) {
-      closeDefinitionIfDangling(t);
+      closeDefinitionIfDangling(t, i);
       const header = restOfLine(i);
       const parsed = readHeader(t, header, visibility);
 
@@ -245,10 +246,13 @@ export function parse(source: string): ParseResult {
     // 定義の中に、字下げして `下位処理とは` … と並べる書き方。マニュアル 02「局所処理単語」。
     // 末尾に `。` は付けず、次の `○○とは` が来たところで暗黙に閉じる。
     // 最後に `本体とは` というダミー宣言を置き、そこから先が親の本体になる。
+    // `引数エラーは　（・　→　・）` のように `は` とスタック仕様だけの行も局所処理単語
+    // （Mind 9 の tool/mreplace.src）。局所変数の宣言とは、種別の語が無いことで見分ける。
     if (
       current !== null &&
       t.kind === 'word' &&
-      (t.particle === 'とは' || (t.particle === 'は' && t.normalized === BODY_MARKER)) &&
+      (t.particle === 'とは' ||
+        (t.particle === 'は' && (t.normalized === BODY_MARKER || isStackSpecOnly(restOfLine(i))))) &&
       t.range.start.character > 0
     ) {
       closeNestedWord(t.range.start);
@@ -337,6 +341,15 @@ export function parse(source: string): ParseResult {
       }
     }
 
+    // --- 定義の中の条件コンパイル ---
+    // 指示の `。` を定義の終端と取り違えないよう、同じ行の `。` まで読み飛ばす
+    if (current !== null && t.kind === 'word' && CONDITIONAL_DIRECTIVES.has(t.normalized)) {
+      const rest = restOfLine(i);
+      const end = rest.findIndex((r) => r.kind === 'terminator');
+      if (end >= 0) i += end + 1;
+      continue;
+    }
+
     // --- 定義の終端 ---
     if (t.kind === 'terminator' && current !== null && blocks.length === 0) {
       closeDefinition(t.range.end);
@@ -380,8 +393,42 @@ export function parse(source: string): ParseResult {
     endOfCompilation: lexed.endOfCompilation,
   };
 
-  function closeDefinitionIfDangling(next: Token): void {
+  /**
+   * 定義の見出しのあとに、本体らしいものがまだ何も無いか。
+   *
+   * 条件コンパイルで見出しだけを書き分けることがある（Mind 9 の samplew/subsource-open-childwin.src）。
+   *
+   *   　　未定義条件コンパイル　子ウィンドウのボタンテキスト。
+   *   ラベルを持つ子ウィンドウを開いて描画とは　（・　→　・）
+   *   　　条件コンパイル終り
+   *   　　定義済条件コンパイル　子ウィンドウのボタンテキスト。
+   *   ラベルとボタンを持つ子ウィンドウを開いて描画とは　（・　→　・）
+   *   　　条件コンパイル終り
+   *   　　　　（本体）
+   *
+   * 実際に有効になる見出しは 1 つだけなので、本体の無い見出しに続く見出しは閉じ忘れではない。
+   */
+  function headerOnly(headerLine: number, nextIndex: number): boolean {
+    // 見出しの行より後ろ、次の見出しより前のトークン
+    let from = nextIndex;
+    while (from > 0 && tokens[from - 1]!.range.start.line > headerLine) from--;
+    const body = tokens.slice(from, nextIndex).filter((t) => t.kind !== 'comment');
+    const directiveLines = new Set(
+      body
+        .filter((t) => t.kind === 'word' && CONDITIONAL_DIRECTIVES.has(t.normalized))
+        .map((t) => t.range.start.line),
+    );
+    return body.every((t) => directiveLines.has(t.range.start.line));
+  }
+
+  function closeDefinitionIfDangling(next: Token, nextIndex: number): void {
     if (current === null) return;
+    if (headerOnly(current.def.range.start.line, nextIndex)) {
+      // 条件コンパイルで書き分けた見出しの片方。名前は他から引用されうるので定義としては残す
+      closeDefinition(next.range.start);
+      blocks.length = 0;
+      return;
+    }
     diagnostics.push({
       message: `\`${current.def.name.raw}\` の定義が \`。\` で閉じられていません`,
       range: current.def.name.range,
@@ -427,6 +474,22 @@ function findIncludes(tokens: readonly Token[]): IncludeRef[] {
 }
 /** 局所処理単語の並びを終え、親の本体が始まることを示すダミー宣言 */
 const BODY_MARKER = normalize('本体');
+
+/**
+ * 条件コンパイルの指示語（正規形）。定義の中に書かれることがあり、その `。` は
+ * 指示の終わりであって定義の終わりではない（Mind 9 の tool/mhead.src など）。
+ *
+ *   一つのファイルを処理とは　（ファイル名、標準入力、行数　→　・）
+ *   　　…
+ *   　　条件コンパイル　ｔａｉｌ動作。      ← ここで定義を閉じてはいけない
+ *   　　…
+ *   　　条件コンパイル終り。
+ *   　　…
+ *   　　。
+ */
+const CONDITIONAL_DIRECTIVES = new Set(
+  ['条件コンパイル', '定義済条件コンパイル', '未定義条件コンパイル', '条件コンパイル終り'].map(normalize),
+);
 const BLOCK_INDEX = new Map(SPECS.map((s, i) => [s, i] as const));
 
 /**
@@ -441,6 +504,15 @@ const BLOCK_INDEX = new Map(SPECS.map((s, i) => [s, i] as const));
  * ただし本文の普通の行を宣言と誤認しないよう、行頭で始まり、
  * うしろに語が 1 つだけ続き、助詞が付いていない場合に限る。
  */
+/** 行の残りがスタック仕様のコメント `（・　→　・）` だけか */
+function isStackSpecOnly(rest: readonly Token[]): boolean {
+  return (
+    rest.length > 0 &&
+    rest.every((t) => t.kind === 'comment') &&
+    rest.some((t) => /→|->/.test(t.raw) && /^[（(]/.test(t.raw))
+  );
+}
+
 function localDeclarationKind(
   head: Token,
   rest: readonly Token[],
@@ -453,6 +525,18 @@ function localDeclarationKind(
   if (!firstOnLine) return null;
   // `例外は　＿任意進処理` のように、制御構文の語は宣言ではない
   if (blockRoleOf(head.normalized, head.raw) !== null) return null;
+  // `日時１は　構造体　日時型`（Mind 9 の tool/stamp.src など）
+  const [first, second] = words;
+  if (
+    words.length === 2 &&
+    first !== undefined &&
+    second !== undefined &&
+    STRUCT_KEYWORDS.has(first.normalized) &&
+    second.particle === null &&
+    !rest.some((t) => t.kind === 'terminator')
+  ) {
+    return first;
+  }
   if (words.length !== 1) return null;
   const only = words[0]!;
   if (only.particle !== null) return null;

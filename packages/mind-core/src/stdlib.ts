@@ -1,7 +1,8 @@
 /**
  * 標準単語辞書の索引。
  *
- * 辞書そのもの（`data/stdlib.json`）は配布物から生成してコミットしてある。
+ * 辞書そのもの（`data/stdlib/<配布物>.json`）は配布物から生成してコミットしてある。
+ * 配布物ごとに 1 ファイルで、どれを使うかは `mind.distribution` の設定で決まる。
  * このモジュールは中身を読むだけでファイルには触らない（純関数のまま保つ）。
  * 読み込みは利用側（Language Server）が `@mindls/core/stdlib` から行う。
  */
@@ -22,7 +23,15 @@ export interface StdlibWord {
 }
 
 export interface StdlibDocument {
-  readonly source: { readonly distribution: string; readonly library: string };
+  readonly source: {
+    /** `windows-9` `linux-8` など。distributions.json の ID */
+    readonly distribution: string;
+    readonly library: string;
+    /** 表示用の名前。`Mind 9 for Windows` */
+    readonly label?: string;
+    /** 生成に使った配布物の版。`9.04` */
+    readonly version?: string;
+  };
   readonly words: readonly StdlibWord[];
 }
 
@@ -32,6 +41,10 @@ export interface StdlibIndex {
   /** 補完候補に出す大域の語 */
   readonly words: readonly StdlibWord[];
   readonly library: string;
+  /** distributions.json の ID。空なら辞書なし */
+  readonly distribution: string;
+  /** ホバーに出す出典の説明。`Mind 9 for Windows 9.04` */
+  readonly origin: string;
 }
 
 export function createStdlibIndex(doc: StdlibDocument): StdlibIndex {
@@ -44,11 +57,22 @@ export function createStdlibIndex(doc: StdlibDocument): StdlibIndex {
       byNormalized.set(w.normalized, w);
     }
   }
-  return { byNormalized, words, library: doc.source.library };
+  const origin = [doc.source.label ?? doc.source.distribution, doc.source.version ?? '']
+    .filter((x) => x !== '')
+    .join(' ');
+  return {
+    byNormalized,
+    words,
+    library: doc.source.library,
+    distribution: doc.source.distribution,
+    origin,
+  };
 }
 
 export const EMPTY_STDLIB: StdlibIndex = {
   byNormalized: new Map(),
   words: [],
   library: '',
+  distribution: '',
+  origin: '',
 };

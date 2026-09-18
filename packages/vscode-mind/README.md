@@ -27,10 +27,18 @@ VS Code で書くための拡張です。**Mind の配布物も Docker も要り
 
 ## はじめに
 
-Mind のソースは **EUC-JP**（Linux 版）または **Shift_JIS**（Windows 版）です。
+使っている Mind に合わせて **`mind.distribution`** を選んでください。
+標準単語の辞書（補完・ホバー・未定義単語の診断）が切り替わります。
+
+| `mind.distribution` | 配布物 | ソースの文字コード |
+|---|---|---|
+| `windows-9`（既定） | Mind 9 for Windows | Shift_JIS |
+| `linux-8` | Mind 8 for Linux | EUC-JP |
+
 VS Code の既定は UTF-8 なので、フォルダーを開いたらコマンドパレットから
 **`Mind: このワークスペースの文字コードと関連付けを設定する`** を実行してください。
-`files.encoding` を Mind 言語スコープで設定し、`*.src` を Mind に関連付けます。
+`files.encoding` を Mind 言語スコープで設定し、`*.src` を Mind に関連付けます
+（`mind.distribution` に合った文字コードが最初の候補に出ます）。
 
 ## 複数ファイルのプログラム
 
@@ -64,6 +72,7 @@ cd Mind-Docker && make build     # mind-docker:8.0.08 ができる
 
 | 設定 | 既定 | 内容 |
 |---|---|---|
+| `mind.distribution` | `windows-9` | 使っている Mind の配布物（`windows-9` / `linux-8`）。標準単語の辞書が切り替わる |
 | `mind.library` | `file` | リンクする標準ライブラリ |
 | `mind.diagnostics.undefinedWords` | `true` | 定義されていない単語を指摘する |
 | `mind.diagnostics.forwardReferences` | `true` | 定義より前での参照を指摘する |
@@ -75,8 +84,11 @@ cd Mind-Docker && make build     # mind-docker:8.0.08 ができる
 
 ## 既知の制限
 
-- Mind 9 で追加された単語と `guilib`（GUI 編）の語彙は入っていません。
-  辞書は Mind 8 for Linux の配布物から作っています
+- `guilib`（GUI 編）の語彙は入っていません。基本セットには GUI ライブラリのソースが
+  同梱されていないためです。GUI のプログラムでは `mind.library` を `guilib` にしてください
+  （未定義単語の診断が黙ります）
+- 実コンパイラ連携（`mind.compiler.enabled`）は Mind 8 for Linux の Docker イメージを使います。
+  Mind 9 for Windows にしか無い単語は、そちらではエラーになります
 - 全文フォーマッタはありません（入力中の字下げのみ）。
   Mind には字下げの流儀が複数あり、整形すると既存のソースに大きな差分が出るためです
 - `条件コンパイル` の条件は評価しません。その配下の取り込みも「取り込み」として数えます

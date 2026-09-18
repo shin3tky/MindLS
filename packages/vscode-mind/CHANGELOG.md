@@ -5,6 +5,46 @@
 
 ## [未リリース]
 
+## [0.1.0] - 2026-09-18
+
+Mind 9 for Windows（9.04）に対応しました。
+
+### 追加
+
+- **配布物の切り替え**（`mind.distribution`、既定は `windows-9`）。標準単語辞書を
+  配布物ごとに持つようにした。`linux-8` を選べばこれまでと同じ Mind 8 for Linux の辞書になる。
+  `windows` `linux` `mind9` などの別名も受け付け、知らない値なら既定に倒して知らせる
+- **Mind 9 for Windows の標準単語辞書**（大域 1,241 語。`fwinAPI.src` `fnamedos.src` の単語、
+  `一行切り出し` `音を再生` など Mind 9 で増えた単語、カーネル単語表 `c_wordsw.wrd` を含む）
+- コンパイラの原始シンボルテーブル（`lib/yoyakugo.wrd`）にあって辞書に無い語を予約語表に加えた
+  （`アドレス` `ローカル語を捨てる` `定数配列` など）
+- ホバーに辞書の出典の配布物を出すようにした（`標準ライブラリ file（Mind 9 for Windows 9.04）`）
+- 文字コード設定コマンドの最初の候補を `mind.distribution` に合わせた（Windows 版は Shift_JIS）
+
+### 変更
+
+- 配布物ごとの違い（アーカイブ名・トップディレクトリ・ライブラリの置き場所・文字コード）を
+  `packages/mind-core/data/distributions.json` に寄せた。辞書の生成（`tools/gen-stdlib-dict.ts`）と
+  サンプルの展開（`tools/extract-samples.ts`）はこの定義に従い、tgz と zip の両方を読む。
+  配布物のルートは目印のファイルで探すので、トップディレクトリの名前には依存しない
+- 辞書の置き場所を `data/stdlib.json` から `data/stdlib/<配布物>.json` に移した
+- 公式コーパスのテストを配布物ごとに回すようにした。Mind 9 ではサンプル・教材・ツールのソース
+  52 本と標準ライブラリ 47 本で既定の診断がゼロであることを、取り込み用ソース 7 本と
+  GUI サンプル 120 本で構文エラーが出ないことを、わざと誤りを入れた教材 2 本でエラーになることを確かめる
+
+### 修正
+
+Mind 9 の配布物に当てて分かった、解析の取り違えを直した。
+
+- 定義の中の `条件コンパイル　○○。` の `。` で定義が閉じたとみなしていた。
+  以降の局所変数が見えなくなり、未定義単語を大量に報告していた（`tool/mhead.src`）
+- `未定義条件コンパイル　○○。` `定義済条件コンパイル　○○。` の ○○ を、定義より前での参照と報告していた
+- 条件コンパイルで見出しだけを書き分けた定義を、閉じ忘れとエラーにしていた
+- `日時１は　構造体　日時型` のような、型紙名を伴う構造体の局所宣言を読めていなかった
+- `引数エラーは　（・　→　・）` のように `は` とスタック仕様だけで書く局所処理単語を読めていなかった
+- Shift_JIS の全角二重引用符で囲んだ文字列 `”…”` を文字列と認識していなかった（構文ハイライトも同様。
+  あわせて `『』` `“”` もハイライトするようにした）
+
 ## [0.0.3] - 2026-09-18
 
 ### 修正
@@ -97,7 +137,8 @@ Mind のソースを VS Code で書くための最初の版です。Mind の配�
   （Linux 版は EUC-JP、Windows 版は Shift_JIS）
 - `Mind: Language Server を再起動する`
 
-[未リリース]: https://github.com/shin3tky/MindLS/compare/v0.0.3...HEAD
+[未リリース]: https://github.com/shin3tky/MindLS/compare/v0.1.0...HEAD
+[0.1.0]: https://github.com/shin3tky/MindLS/compare/v0.0.3...v0.1.0
 [0.0.3]: https://github.com/shin3tky/MindLS/compare/v0.0.2...v0.0.3
 [0.0.2]: https://github.com/shin3tky/MindLS/compare/v0.0.1...v0.0.2
 [0.0.1]: https://github.com/shin3tky/MindLS/releases/tag/v0.0.1

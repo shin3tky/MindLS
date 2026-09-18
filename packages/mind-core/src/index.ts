@@ -79,3 +79,10 @@ export { hoverAt } from './hover.ts';
 export type { HoverContext, HoverInfo } from './hover.ts';
 export { createStdlibIndex, EMPTY_STDLIB } from './stdlib.ts';
 export type { StdlibDocument, StdlibIndex, StdlibWord } from './stdlib.ts';
+export { distributionIds, resolveDistribution } from './distribution.ts';
+export type {
+  DistributionLayout,
+  DistributionManifest,
+  DistributionSpec,
+  ResolvedDistribution,
+} from './distribution.ts';

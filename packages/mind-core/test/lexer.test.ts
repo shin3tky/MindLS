@@ -58,6 +58,17 @@ describe('リテラル', () => {
     expect(words('　"dir /w"を')[0]).toMatchObject({ kind: 'string' });
   });
 
+  it('Shift_JIS の全角二重引用符 ” … ” の文字列（Mind 9 の sample/playSound.src）', () => {
+    expect(words('　”b: 「音を鳴らす」を実行”続')[0]).toMatchObject({
+      kind: 'string',
+      raw: '”b: 「音を鳴らす」を実行”',
+    });
+  });
+
+  it('CRLF の行末は単語に混ざらない', () => {
+    expect(raws('メインとは\r\n　表示すること。\r\n')).toEqual(['メインとは', '表示すること', '。']);
+  });
+
   it('閉じられていない文字列を報告する', () => {
     expect(lex('　「閉じていない').diagnostics.map((d) => d.code)).toContain('unterminated-string');
   });
