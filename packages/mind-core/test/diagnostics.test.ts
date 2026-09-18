@@ -51,6 +51,17 @@ describe('未定義単語', () => {
     expect(codes(src, { undefinedWords: true, stdlib })).toEqual([]);
   });
 
+  it('配列の `要素数` は予約語なので報告しない', () => {
+    const src = [
+      '金種は　定数配列　１００　５０　１０。',
+      'メインとは',
+      '　金種の　要素数を　回数指定し',
+      '　　金種（回数）を　表示し',
+      '　繰り返すこと。',
+    ].join('\n');
+    expect(codes(src, { undefinedWords: true, stdlib })).toEqual([]);
+  });
+
   it('取り込み先のシンボルを渡せば報告しない', () => {
     const src = 'メインとは\n　簡易小数表示すること。';
     expect(codes(src, { undefinedWords: true, stdlib })).toEqual(['undefined-word']);

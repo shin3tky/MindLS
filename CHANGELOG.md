@@ -5,6 +5,18 @@
 
 ## [未リリース]
 
+## [0.0.3] - 2026-09-18
+
+### 修正
+
+- 配列の `要素数`（`売り上げの　要素数を　回数指定し`）を未定義単語と誤報告していた。
+  マニュアル 5「配列」の予約語として予約語表に加えた（ホバーにも説明が出る）
+
+### そのほか
+
+- サンプル `examples/kidoairaku.src`（喜怒哀楽ライフゲーム）を追加。エスケープシーケンスで
+  盤面を固定して描き直す。Mind 8 for Linux でコンパイル・実行を確認済みで、診断は 0 件
+
 ## [0.0.2] - 2026-09-17
 
 ### 追加
@@ -85,6 +97,7 @@ Mind のソースを VS Code で書くための最初の版です。Mind の配�
   （Linux 版は EUC-JP、Windows 版は Shift_JIS）
 - `Mind: Language Server を再起動する`
 
-[未リリース]: https://github.com/shin3tky/MindLS/compare/v0.0.2...HEAD
+[未リリース]: https://github.com/shin3tky/MindLS/compare/v0.0.3...HEAD
+[0.0.3]: https://github.com/shin3tky/MindLS/compare/v0.0.2...v0.0.3
 [0.0.2]: https://github.com/shin3tky/MindLS/compare/v0.0.1...v0.0.2
 [0.0.1]: https://github.com/shin3tky/MindLS/releases/tag/v0.0.1

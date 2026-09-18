@@ -22,6 +22,13 @@ describe('予約語', () => {
     expect(RESERVED_BY_NORMALIZED.get(normalize('条件コンパイル'))?.kind).toBe('コンパイラ指示');
   });
 
+  it('配列の `要素数` を引ける（マニュアル 5 配列）', () => {
+    for (const raw of ['要素数', '要素数を']) {
+      expect(isReserved(normalize(raw)), raw).toBe(true);
+    }
+    expect(RESERVED_BY_NORMALIZED.get(normalize('要素数'))?.kind).toBe('予約語');
+  });
+
   it('正規形が衝突していない', () => {
     expect(RESERVED_BY_NORMALIZED.size).toBe(RESERVED_WORDS.length);
   });

@@ -95,6 +95,7 @@ code --extensionDevelopmentPath="$PWD/packages/vscode-mind" examples
 | リネームの拒否 | `一行表示` で **F2** | 「このファイルで定義されていません」と理由が出る |
 | 字下げ | `ならば` だけの行で **Enter**、次の行で `つぎに` と打つ | 深くなり、`つぎに` で戻る |
 | 診断 | `examples/diagnostics.src` を開く | 警告が 3 つ（下記） |
+| 診断が出ない例 | `examples/kidoairaku.src`（喜怒哀楽ライフゲーム）を開く | 警告 0。`近傍Ｘの　要素数を` の `要素数` にホバーすると予約語の説明が出る |
 
 `examples/diagnostics.src` はわざと引っかけてあります。
 
@@ -173,7 +174,7 @@ node packages/mind-language-server/dist/cli.js --stdio
 
 ```sh
 npm run bundle     # esbuild で拡張と Language Server を 1 ファイルずつに束ねる
-npm run package    # vsce package → dist/vscode-mind-0.0.1.vsix
+npm run package    # vsce package → dist/vscode-mind-<version>.vsix
 ```
 
 npm workspaces では `@mindls/language-server` が node_modules のシンボリックリンクになっていて、
@@ -194,12 +195,12 @@ npm run package                     # dist/vscode-mind-<version>.vsix
 
 # 2. 1 コミットにまとめてタグを打つ
 git add -A
-git commit -m "vscode-mind 0.0.2 をリリース."
-git tag v0.0.2
+git commit -m "vscode-mind 0.0.3 をリリース."
+git tag v0.0.3
 git push origin main --tags
 
 # 3. 確かめたその .vsix を送る
-npx vsce publish --packagePath dist/vscode-mind-0.0.2.vsix
+npx vsce publish --packagePath dist/vscode-mind-0.0.3.vsix
 ```
 
 出す前に見るところ。

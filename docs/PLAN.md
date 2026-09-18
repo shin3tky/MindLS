@@ -4,7 +4,7 @@
 　　　言語仕様は Version 9 を基準。検証環境は Linux 版が最新の **Version 8**（後述 2.5）
 成果物: VS Code 向け拡張 + LSP 準拠 Language Server
 実装スタック: **TypeScript 一本**（`vscode-languageserver-node`）
-最終更新: 2026-09-16（Mind-Docker への分離、M0 〜 M4 完了、標準単語辞書の生成を反映）
+最終更新: 2026-09-18（vscode-mind 0.0.3、`要素数` を予約語表に追加）
 
 > **更新履歴**
 > - 2026-09-14 初版
@@ -28,7 +28,9 @@
 >   （**桁は入っていなかった**）、常駐コンテナ + `docker exec` のアダプタを実装。
 >   実物との答え合わせで自前診断の取り違えを 4 件修正した。
 > - 2026-09-17 **取り込みの索引完了**。`"x.src"を　コンパイル。` でつながるファイルを見るようにし、
->   **未定義単語の診断を既定で有効**にした（549 件 green）。
+>   **未定義単語の診断を既定で有効**にした（549 件 green）。v0.0.2 を公開。
+> - 2026-09-18 サンプル `examples/kidoairaku.src`（喜怒哀楽ライフゲーム）を書いて実コンパイラで動かしたところ、
+>   配列の `要素数` を未定義単語と誤報告していたので予約語表に加えた（551 件 green）。v0.0.3。
 >
 > 数字は書いた時点のもの。現在値は各節を参照。
 
@@ -382,7 +384,7 @@ MindLS/
 │  ├─ collect-inf.sh              # .inf の実物を集める（コンテナの中で走らせる）
 │  ├─ bundle.mts                  # esbuild で配布用に束ねる
 │  └─ gen-icon.py                 # アイコンを描く
-├─ examples/                      # 拡張を試すための見本（F5 で開く）
+├─ examples/                      # 拡張を試すための見本（F5 で開く）。hello / diagnostics / kidoairaku
 ├─ fixtures/
 │  ├─ hello.src  syntax.src       # 文法テスト用（コミットする）
 │  ├─ inf-corpus/                 # .inf のコーパス（**コミットする**。実コンパイラの答え）
@@ -779,7 +781,7 @@ vsce はこれを .vsix に入れられない。**esbuild で拡張と Language 
 
 ```sh
 npm run bundle     # tsc --build してから esbuild
-npm run package    # vsce package → dist/vscode-mind-0.0.1.vsix
+npm run package    # vsce package → dist/vscode-mind-<version>.vsix
 ```
 
 .vsix は 12 ファイル・200 KB。`packages/vscode-mind/test/bundle.test.ts` が、
@@ -912,7 +914,7 @@ docker run --rm --platform linux/amd64 \
 
 ## 10. 次の一手
 
-M0〜M6 は完了し、拡張は Marketplace に出した（`shin3tky.vscode-mind` v0.0.1）。
+M0〜M6 は完了し、拡張は Marketplace に出した（`shin3tky.vscode-mind`、現在 v0.0.3）。
 ここから先は**実コンパイラとの結合**だけが残っている。
 
 ### 残タスク

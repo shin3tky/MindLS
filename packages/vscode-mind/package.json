@@ -2,7 +2,7 @@
   "name": "vscode-mind",
   "displayName": "Mind (日本語プログラミング言語)",
   "description": "日本語プログラミング言語 Mind の構文ハイライトと Language Server",
-  "version": "0.0.2",
+  "version": "0.0.3",
   "publisher": "shin3tky",
   "icon": "icon.png",
   "repository": {
@@ -37,7 +37,7 @@
     "build": "tsc --build",
     "bundle": "node ../../tools/bundle.mts",
     "vscode:prepublish": "node ../../tools/bundle.mts",
-    "package": "vsce package --no-dependencies --out ../../dist/",
+    "package": "node -e \"require('node:fs').mkdirSync('../../dist',{recursive:true})\" && vsce package --no-dependencies --out ../../dist/",
     "release": "vsce publish --no-dependencies"
   },
   "contributes": {
