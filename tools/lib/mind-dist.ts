@@ -7,9 +7,9 @@
  */
 
 import { execFileSync } from 'node:child_process';
-import { existsSync, mkdtempSync, readFileSync, readdirSync, rmSync, statSync } from 'node:fs';
+import { existsSync, lstatSync, mkdtempSync, readFileSync, readdirSync, realpathSync, rmSync, statSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { basename, dirname, join, resolve } from 'node:path';
+import { basename, dirname, isAbsolute, join, relative, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import type { DistributionManifest, DistributionSpec } from '../../packages/mind-core/src/distribution.ts';
@@ -72,9 +72,82 @@ export interface Extracted {
   readonly cleanup: () => void;
 }
 
+/** アーカイブ内の名前が展開先の外を指せないことを確認する。 */
+export function assertSafeArchiveEntry(name: string): void {
+  const normalized = name.replaceAll('\\', '/');
+  if (
+    normalized.startsWith('/') ||
+    /^[A-Za-z]:\//u.test(normalized) ||
+    normalized.split('/').includes('..')
+  ) {
+    throw new Error(`アーカイブに展開先の外を指すパスがあります: ${JSON.stringify(name)}`);
+  }
+}
+
+function validateArchiveEntries(archivePath: string): void {
+  const zip = /\.zip$/iu.test(archivePath);
+  const output = zip
+    ? execFileSync('unzip', ['-Z1', archivePath], { stdio: ['ignore', 'pipe', 'pipe'] })
+    : execFileSync('tar', ['tzf', archivePath], { stdio: ['ignore', 'pipe', 'pipe'] });
+  for (const name of output.toString('utf8').split(/\r?\n/u)) {
+    if (name !== '') assertSafeArchiveEntry(name);
+  }
+
+  // リンクを先に作ってからその配下へ書く形式だと、展開後の検証では手遅れになる。
+  // 通常ファイルとディレクトリ以外は、展開前の一覧で拒否する。
+  const verbose = zip
+    ? execFileSync('unzip', ['-Z', '-l', archivePath], { stdio: ['ignore', 'pipe', 'pipe'] })
+    : execFileSync('tar', ['tvzf', archivePath], { stdio: ['ignore', 'pipe', 'pipe'] });
+  for (const line of verbose.toString('utf8').split(/\r?\n/u)) {
+    if (/^[bchlps][rwxStTs-]{9}[ +]/u.test(line)) {
+      throw new Error(`アーカイブにリンクまたは特殊ファイルがあります: ${line}`);
+    }
+  }
+}
+
+function isWithin(root: string, candidate: string): boolean {
+  const rel = relative(root, candidate);
+  return rel === '' || (rel !== '..' && !rel.startsWith(`..${sep}`) && !isAbsolute(rel));
+}
+
+/** 展開後に、リンクを含む全要素の実体が展開先の内側にあることを確認する。 */
+function validateExtractedTree(dir: string): void {
+  const root = realpathSync.native(dir);
+  const pending: Buffer[] = [Buffer.from(root)];
+  while (pending.length > 0) {
+    const current = pending.pop()!;
+    for (const name of readdirSync(current, { encoding: 'buffer' })) {
+      const path = Buffer.concat([current, Buffer.from('/'), name]);
+      const stat = lstatSync(path);
+      if (stat.isSymbolicLink()) {
+        throw new Error(`アーカイブにシンボリックリンクがあります: ${path.toString()}`);
+      }
+      let real: string;
+      try {
+        real = realpathSync.native(path);
+      } catch {
+        throw new Error(`アーカイブに解決できないリンクがあります: ${path.toString()}`);
+      }
+      if (!isWithin(root, real)) {
+        throw new Error(`アーカイブの展開結果が一時ディレクトリの外を指しています: ${path.toString()}`);
+      }
+
+      if (stat.isDirectory()) pending.push(path);
+      else if (!stat.isFile()) {
+        throw new Error(`アーカイブに通常ファイル以外の要素があります: ${path.toString()}`);
+      }
+    }
+  }
+}
+
 /** 配布物を一時ディレクトリに丸ごと展開する（中身の配置を仮定しないため） */
 export function extractArchive(archivePath: string): Extracted {
   if (!existsSync(archivePath)) throw new Error(`配布物が見つかりません: ${archivePath}`);
+  try {
+    validateArchiveEntries(archivePath);
+  } catch (error) {
+    throw new Error(`配布物のパスを検証できませんでした: ${archivePath}\n${String(error)}`);
+  }
   const dir = mkdtempSync(join(tmpdir(), 'mind-dist-'));
   const cleanup = () => rmSync(dir, { recursive: true, force: true });
   try {
@@ -83,6 +156,7 @@ export function extractArchive(archivePath: string): Extracted {
     } else {
       execFileSync('tar', ['xzf', archivePath, '-C', dir], { stdio: ['ignore', 'ignore', 'pipe'] });
     }
+    validateExtractedTree(dir);
   } catch (error) {
     cleanup();
     throw new Error(`配布物を展開できませんでした: ${archivePath}\n${String(error)}`);

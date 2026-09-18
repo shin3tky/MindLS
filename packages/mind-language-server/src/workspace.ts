@@ -12,9 +12,9 @@
  * **取り込みでつながっているファイルの和集合**という、甘いほうに倒した見方をする。
  */
 
-import { readFileSync, readdirSync, statSync } from 'node:fs';
+import { readFileSync, readdirSync, realpathSync, statSync } from 'node:fs';
 import type { Dirent } from 'node:fs';
-import { dirname, extname, join, resolve } from 'node:path';
+import { dirname, extname, isAbsolute, join, relative, resolve, sep } from 'node:path';
 
 import { parse } from '@mindls/core';
 import type { ParseResult } from '@mindls/core';
@@ -72,14 +72,27 @@ export class WorkspaceIndex {
   private files: string[] | null = null;
 
   constructor(root: string) {
-    this.root = resolve(root);
+    const absolute = resolve(root);
+    try {
+      this.root = realpathSync.native(absolute);
+    } catch {
+      this.root = absolute;
+    }
   }
 
   /** ファイルが増減したかもしれないときに呼ぶ */
   invalidate(path?: string): void {
     this.files = null;
     if (path === undefined) this.cache.clear();
-    else this.cache.delete(resolve(path));
+    else {
+      const absolute = resolve(path);
+      this.cache.delete(absolute);
+      try {
+        this.cache.delete(realpathSync.native(absolute));
+      } catch {
+        /* 削除済みなど、実体を解決できなければ絶対パス側だけ消せばよい */
+      }
+    }
   }
 
   /**
@@ -90,7 +103,11 @@ export class WorkspaceIndex {
    * `file.src` が取り込む他のファイルまで見えるようにするため。
    */
   importsFor(path: string): ImportedSymbols {
-    const start = resolve(path);
+    const requested = resolve(path);
+    const start = fileWithin(this.root, requested);
+    if (start === null) {
+      return { globals: new Set(), files: [requested], incomplete: true };
+    }
     const neighbours = this.neighbourGraph();
 
     const seen = new Set<string>([start]);
@@ -140,19 +157,22 @@ export class WorkspaceIndex {
 
   /** 1 ファイルを解析して覚える。更新されていれば読み直す */
   private entryOf(path: string): Entry | null {
+    const safePath = fileWithin(this.root, path);
+    if (safePath === null) return null;
+
     let mtimeMs: number;
     try {
-      mtimeMs = statSync(path).mtimeMs;
+      mtimeMs = statSync(safePath).mtimeMs;
     } catch {
       return null;
     }
 
-    const cached = this.cache.get(path);
+    const cached = this.cache.get(safePath);
     if (cached !== undefined && cached.mtimeMs === mtimeMs) return cached;
 
     let text: string;
     try {
-      text = readFileSync(path, 'utf8');
+      text = readFileSync(safePath, 'utf8');
     } catch {
       return null;
     }
@@ -160,16 +180,16 @@ export class WorkspaceIndex {
     const parsed = parse(text);
     const includes: string[] = [];
     const missing: string[] = [];
-    const dir = dirname(path);
+    const dir = dirname(safePath);
 
     for (const ref of parsed.includes) {
-      const target = resolve(dir, ref.path);
-      if (exists(target)) includes.push(target);
+      const target = fileWithin(this.root, resolve(dir, ref.path));
+      if (target !== null) includes.push(target);
       else missing.push(ref.path);
     }
 
-    const entry: Entry = { path, mtimeMs, globals: globalsOf(parsed), includes, missing };
-    this.cache.set(path, entry);
+    const entry: Entry = { path: safePath, mtimeMs, globals: globalsOf(parsed), includes, missing };
+    this.cache.set(safePath, entry);
     return entry;
   }
 
@@ -183,12 +203,21 @@ export class WorkspaceIndex {
   }
 }
 
-function exists(path: string): boolean {
+/** 実体を解決したファイルが root の内側にあるときだけ、その正規パスを返す。 */
+function fileWithin(root: string, path: string): string | null {
+  let real: string;
   try {
-    return statSync(path).isFile();
+    real = realpathSync.native(path);
+    if (!statSync(real).isFile()) return null;
   } catch {
-    return false;
+    return null;
   }
+  return isWithin(root, real) ? real : null;
+}
+
+function isWithin(root: string, candidate: string): boolean {
+  const rel = relative(root, candidate);
+  return rel === '' || (rel !== '..' && !rel.startsWith(`..${sep}`) && !isAbsolute(rel));
 }
 
 function walk(dir: string, depth: number, out: string[]): void {

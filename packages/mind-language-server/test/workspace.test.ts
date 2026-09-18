@@ -1,4 +1,4 @@
-import { mkdirSync, mkdtempSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, symlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -70,6 +70,44 @@ describe('全部は見えていないとき', () => {
       'main.src': '条件コンパイル　ＵＮＩＸ環境。\n条件コンパイル終り。\nメインとは\n　表示すること。',
     });
     expect(new WorkspaceIndex(root).importsFor(join(root, 'main.src')).incomplete).toBe(false);
+  });
+});
+
+describe('ワークスペース境界', () => {
+  it('.. でワークスペース外のファイルを取り込まない', () => {
+    const parent = mkdtempSync(join(tmpdir(), 'mindls-boundary-'));
+    const root = join(parent, 'workspace');
+    mkdirSync(root);
+    writeFileSync(join(parent, 'outside.src'), '外部の秘密とは\n　表示すること。', 'utf8');
+    writeFileSync(
+      join(root, 'main.src'),
+      '"../outside.src"を　コンパイル。\nメインとは\n　外部の秘密を　表示すること。',
+      'utf8',
+    );
+
+    const imports = new WorkspaceIndex(root).importsFor(join(root, 'main.src'));
+    expect(imports.globals.has('外部の秘密')).toBe(false);
+    expect(imports.files).toHaveLength(1);
+    expect(imports.incomplete).toBe(true);
+  });
+
+  it.skipIf(process.platform === 'win32')('外部を指すシンボリックリンクを取り込まない', () => {
+    const parent = mkdtempSync(join(tmpdir(), 'mindls-boundary-'));
+    const root = join(parent, 'workspace');
+    mkdirSync(root);
+    const outside = join(parent, 'outside.src');
+    writeFileSync(outside, '外部の秘密とは\n　表示すること。', 'utf8');
+    symlinkSync(outside, join(root, 'linked.src'));
+    writeFileSync(
+      join(root, 'main.src'),
+      '"linked.src"を　コンパイル。\nメインとは\n　外部の秘密を　表示すること。',
+      'utf8',
+    );
+
+    const imports = new WorkspaceIndex(root).importsFor(join(root, 'main.src'));
+    expect(imports.globals.has('外部の秘密')).toBe(false);
+    expect(imports.files).toHaveLength(1);
+    expect(imports.incomplete).toBe(true);
   });
 });
 
