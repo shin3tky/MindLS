@@ -23,7 +23,7 @@
     "gen:stdlib": "node tools/gen-stdlib-dict.ts"
   },
   "devDependencies": {
-    "@types/node": "26.5.1",
+    "@types/node": "26.6.1",
     "@vscode/vsce": "4.0.0",
     "esbuild": "0.28.2",
     "typescript": "7.0.2",
