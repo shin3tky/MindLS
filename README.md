@@ -114,7 +114,9 @@ code --extensionDevelopmentPath="$PWD/packages/vscode-mind" examples
 | `表示しないこと。` | 否定形の送り仮名は照合前に落ちるので、肯定形と同じ単語になる |
 
 未定義単語の診断は `"x.src"を　コンパイル。` でつながるファイルを一緒に見ます。
-ただし**語彙を把握しきれないと分かったら黙ります** — 取り込み先が 1 つでも見つからないとき、
+取り込み先として読むのは**開いているワークスペースの内側のファイルだけ**です（`..` で外へ出るパスや、
+外を指すシンボリックリンクは読みません）。
+ただし**語彙を把握しきれないと分かったら黙ります** — 取り込み先が 1 つでも見つからない（ワークスペースの外を含む）とき、
 `mind.library` が `file` 以外のとき、取り込みの関係がまったく無く `メイン` も無いとき
 （＝ライブラリとして書かれた断片）。理由は [`docs/PLAN.md`](docs/PLAN.md) にあります。
 
@@ -203,12 +205,12 @@ npm run package                     # dist/vscode-mind-<version>.vsix
 
 # 2. 1 コミットにまとめてタグを打つ
 git add -A
-git commit -m "vscode-mind 0.0.3 をリリース."
-git tag v0.0.3
+git commit -m "vscode-mind 0.1.1 をリリース."
+git tag v0.1.1
 git push origin main --tags
 
 # 3. 確かめたその .vsix を送る
-npx vsce publish --packagePath dist/vscode-mind-0.0.3.vsix
+npx vsce publish --packagePath dist/vscode-mind-0.1.1.vsix
 ```
 
 出す前に見るところ。

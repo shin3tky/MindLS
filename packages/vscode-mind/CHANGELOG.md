@@ -5,6 +5,26 @@
 
 ## [未リリース]
 
+## [0.1.1] - 2026-09-18
+
+### セキュリティ
+
+- 取り込み（`"x.src"を　コンパイル。`）の索引を、**開いているワークスペースの内側に限った**。
+  `"../outside.src"` のように外へ出るパスや、ワークスペースの外を指すシンボリックリンクは
+  読まずに「取り込み先が見つからない」と同じ扱いにする（未定義単語の診断は黙る）。
+  パスは実体（`realpath`）で比べる
+- 辞書の生成とサンプルの展開（`tools/lib/mind-dist.ts`）で、配布物のアーカイブを展開前後に検査するようにした。
+  展開先の外を指す名前（`..` や絶対パス）、シンボリックリンク・ハードリンク・特殊ファイルを含むアーカイブは拒否する
+
+### 変更
+
+- 開発に使う Node.js を **26.5 以上**、TypeScript を **7.0** に上げた（`@types/node` 26.5）。
+  拡張の利用者には影響しない（VS Code 1.90 以上のまま）
+- GitHub Actions に OSV-Scanner を入れ、`package-lock.json` の依存を検査するようにした。
+  Pull Request では新しく持ち込まれる脆弱性を、`main` への push・毎週月曜・手動実行では依存全体を見る
+- Dependabot で npm パッケージと GitHub Actions の更新を週次で確認するようにした
+- `tools/test/` のテストも `npm test` で走るようにした
+
 ## [0.1.0] - 2026-09-18
 
 Mind 9 for Windows（9.04）に対応しました。
@@ -137,7 +157,8 @@ Mind のソースを VS Code で書くための最初の版です。Mind の配�
   （Linux 版は EUC-JP、Windows 版は Shift_JIS）
 - `Mind: Language Server を再起動する`
 
-[未リリース]: https://github.com/shin3tky/MindLS/compare/v0.1.0...HEAD
+[未リリース]: https://github.com/shin3tky/MindLS/compare/v0.1.1...HEAD
+[0.1.1]: https://github.com/shin3tky/MindLS/compare/v0.1.0...v0.1.1
 [0.1.0]: https://github.com/shin3tky/MindLS/compare/v0.0.3...v0.1.0
 [0.0.3]: https://github.com/shin3tky/MindLS/compare/v0.0.2...v0.0.3
 [0.0.2]: https://github.com/shin3tky/MindLS/compare/v0.0.1...v0.0.2

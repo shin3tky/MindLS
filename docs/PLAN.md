@@ -4,10 +4,9 @@
 　　　言語仕様は Version 9 を基準。検証環境は Linux 版が最新の **Version 8**（後述 2.5）
 成果物: VS Code 向け拡張 + LSP 準拠 Language Server
 実装スタック: **TypeScript 7.0**（`vscode-languageserver-node`）
-最終更新: 2026-09-18（vscode-mind 0.0.3、`要素数` を予約語表に追加）
+最終更新: 2026-09-18（vscode-mind 0.1.1、取り込み境界の検査と開発環境の更新）
 
 > **更新履歴**
-> - 2026-09-18 開発環境を Node.js 26.5 以上・TypeScript 7.0 に更新。
 > - 2026-09-14 初版
 > - 2026-09-14 Docker 検証環境の構築完了を反映。
 > - 2026-09-16 処理系の Docker 環境を [Mind-Docker](https://github.com/shin3tky/Mind-Docker) に分離。
@@ -36,6 +35,8 @@
 >   辞書を配布物別（`data/stdlib/windows-9.json` / `linux-8.json`）にして `mind.distribution` で切り替える
 >   （既定 `windows-9`）。Mind 9 のコーパスで見つかった解析の取り違え（定義の中の条件コンパイル、
 >   構造体の局所宣言、`”…”` の文字列など）を直した（公式コーパスを展開した状態で 1,066 件 green）。v0.1.0。
+> - 2026-09-18 開発環境を Node.js 26.5 以上・TypeScript 7.0 に更新。OSV-Scanner と Dependabot を導入。
+>   取り込みの索引をワークスペースの内側に限り、配布物の展開前後にパスとリンクを検査するようにした。v0.1.1。
 >
 > 数字は書いた時点のもの。現在値は各節を参照。
 
@@ -919,7 +920,7 @@ docker run --rm --platform linux/amd64 \
 
 ## 10. 次の一手
 
-M0〜M6 は完了し、拡張は Marketplace に出した（`shin3tky.vscode-mind`、現在 v0.0.3）。
+M0〜M6 は完了し、拡張は Marketplace に出した（`shin3tky.vscode-mind`、現在 v0.1.1）。
 ここから先は**実コンパイラとの結合**だけが残っている。
 
 ### 残タスク
