@@ -5,7 +5,7 @@
   "description": "日本語プログラミング言語 Mind の Language Server と VS Code 拡張",
   "license": "Apache-2.0",
   "engines": {
-    "node": ">=22"
+    "node": ">=26.5.0"
   },
   "workspaces": [
     "packages/*"

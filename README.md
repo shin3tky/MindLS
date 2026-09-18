@@ -46,7 +46,8 @@ Dependabot は npm パッケージと GitHub Actions の更新を週次で確認
 >   --os=darwin --cpu=arm64 @esbuild/darwin-arm64@$(node -p "require('esbuild').version")
 > ```
 
-必要なのは **Node.js 22 以上**と **VS Code 1.90 以上**だけです。
+必要なのは **Node.js 26.5 以上**と **VS Code 1.90 以上**だけです。
+開発時のTypeScriptコンパイラは **TypeScript 7.0** を使用します。
 **Docker も Mind の配布物も要りません。** 標準単語辞書も、実コンパイラの `.inf` のコーパスも、
 生成済みのものをコミットしてあります。
 

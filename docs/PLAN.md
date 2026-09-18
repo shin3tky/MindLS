@@ -3,10 +3,11 @@
 対象: 日本語プログラミング言語 **Mind**（Scripts Lab Inc.）
 　　　言語仕様は Version 9 を基準。検証環境は Linux 版が最新の **Version 8**（後述 2.5）
 成果物: VS Code 向け拡張 + LSP 準拠 Language Server
-実装スタック: **TypeScript 一本**（`vscode-languageserver-node`）
+実装スタック: **TypeScript 7.0**（`vscode-languageserver-node`）
 最終更新: 2026-09-18（vscode-mind 0.0.3、`要素数` を予約語表に追加）
 
 > **更新履歴**
+> - 2026-09-18 開発環境を Node.js 26.5 以上・TypeScript 7.0 に更新。
 > - 2026-09-14 初版
 > - 2026-09-14 Docker 検証環境の構築完了を反映。
 > - 2026-09-16 処理系の Docker 環境を [Mind-Docker](https://github.com/shin3tky/Mind-Docker) に分離。
@@ -344,7 +345,7 @@ interface MindToken {
 
 ```
 MindLS/
-├─ package.json                   # npm workspaces（Node 22 / ESM）
+├─ package.json                   # npm workspaces（Node 26.5 / ESM）
 ├─ tsconfig.base.json  tsconfig.json  vitest.config.ts
 ├─ .gitattributes                 # 改行は LF 固定（Windows 対策）。EUC-JP の原本は触らせない
 ├─ .vscode/launch.json  tasks.json   # F5 で拡張を試す / Language Server にアタッチ
