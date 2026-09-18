@@ -1,5 +1,7 @@
 # MindLS
 
+[![OSV-Scanner](https://github.com/shin3tky/MindLS/actions/workflows/osv-scanner.yml/badge.svg?branch=main)](https://github.com/shin3tky/MindLS/actions/workflows/osv-scanner.yml)
+
 日本語プログラミング言語 [Mind](https://www.scripts-lab.co.jp/mind/whatsmind.html)（Scripts Lab Inc.）の
 Language Server と VS Code 拡張。
 
