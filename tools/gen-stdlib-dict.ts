@@ -191,9 +191,11 @@ function generate(dist: OpenedDistribution): void {
   const words = dedupe(mergeForwardDeclarations(raw));
   const archiveName = dist.archive === null ? basename(dist.root) : basename(dist.archive);
 
+  // 生成日時は入れない。再生成のたびに必ず変わるので、
+  // 「語彙が変わったのか、作り直しただけなのか」が `git diff` から読めなくなる。
+  // 由来は source.version / source.origin が、いつ入ったかは git が持っている。
   const doc = {
     generatedBy: 'tools/gen-stdlib-dict.ts',
-    generatedAt: new Date().toISOString().slice(0, 10),
     source: {
       distribution: dist.id,
       label: spec.label,

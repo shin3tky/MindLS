@@ -1,6 +1,5 @@
 {
   "generatedBy": "tools/gen-stdlib-dict.ts",
-  "generatedAt": "2026-09-18",
   "source": {
     "distribution": "linux-8",
     "label": "Mind 8 for Linux",

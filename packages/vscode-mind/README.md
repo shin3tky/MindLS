@@ -3,6 +3,8 @@
 日本語プログラミング言語 [Mind](https://www.scripts-lab.co.jp/mind/whatsmind.html)（Scripts Lab Inc.）を
 VS Code で書くための拡張です。**Mind の配布物も Docker も要りません。**
 
+VS Code **1.91 以上**で動きます。
+
 ## できること
 
 | | |
@@ -30,10 +32,10 @@ VS Code で書くための拡張です。**Mind の配布物も Docker も要り
 使っている Mind に合わせて **`mind.distribution`** を選んでください。
 標準単語の辞書（補完・ホバー・未定義単語の診断）が切り替わります。
 
-| `mind.distribution` | 配布物 | ソースの文字コード |
-|---|---|---|
-| `windows-9`（既定） | Mind 9 for Windows | Shift_JIS |
-| `linux-8` | Mind 8 for Linux | EUC-JP |
+| `mind.distribution` | 配布物 | ソースの文字コード | 辞書の出どころ |
+|---|---|---|---|
+| `windows-9`（既定） | Mind 9 for Windows | Shift_JIS | 9.05（大域 1,241 語） |
+| `linux-8` | Mind 8 for Linux | EUC-JP | 8.0.08（大域 1,226 語） |
 
 VS Code の既定は UTF-8 なので、フォルダーを開いたらコマンドパレットから
 **`Mind: このワークスペースの文字コードと関連付けを設定する`** を実行してください。

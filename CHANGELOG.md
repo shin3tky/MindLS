@@ -5,15 +5,35 @@
 
 ## [未リリース]
 
+## [0.1.2] - 2026-10-02
+
+依存の入りかたを締め、標準単語辞書を Mind 9 for Windows 9.05 から作り直しました。
+
+### セキュリティ
+
+- **直接の依存を版固定にした**（`package.json` から `^` を外し、`.npmrc` に `save-exact=true`）。
+  同じ `package.json` からは毎回同じ版が入るようになり、版が上がるのは `package.json` と
+  `package-lock.json` を一緒に書き換える Dependabot の PR を通したときだけになる。
+  この版で実際に入る版は、`@types/vscode` 以外これまでと同じ
+
 ### 変更
 
 - **対応する VS Code の下限を 1.91 に上げた**（`engines.vscode: ^1.91.0`）。同梱の
-  `vscode-languageclient` 10.1.1 がもともと 1.91 以上を要求しており、1.90 という表記が実態と合っていなかった
-- 直接の依存を `package.json` で版固定にした（`^` を外し、`.npmrc` に `save-exact=true`）。
-  入る版は変わらない（`package-lock.json` の解決結果は `@types/vscode` 以外同じ）
+  `vscode-languageclient` 10.1.1 がもともと 1.91 以上を要求しており、1.90 という表記が実態と
+  合っていなかった。VS Code 1.90 にはこの版以降の更新が届かなくなる
 - `@types/vscode` を 1.137.0 から **1.91.0**（`engines.vscode` の下限）に下げ、`packages/vscode-mind` に移した。
   下限より新しい API を使うと型エラーになり、`vsce package` も版の食い違いを検査するようになった。
   Dependabot では `versioning-strategy: increase` を明示し、`@types/vscode` を対象から外した
+- **標準単語辞書を Mind 9 for Windows 9.05 から作り直した。** 語彙は 9.04 と同じ（大域 1,241 語）で、
+  ホバーの出典表示だけが `Mind 9 for Windows 9.05` に変わる。
+  9.04 → 9.05 は zip 内 2,400 ファイルのうち 9 ファイルだけの改訂で、ライブラリのソースは含まれていない
+- 辞書から生成日時（`generatedAt`）を落とした。再生成のたびに必ず変わるので、
+  `git diff` から「語彙が変わったのか、作り直しただけなのか」が読めなくなっていた。
+  由来は `source.version` と `source.origin` が持ち、いつ入ったかは git が持つ
+- 依存の更新を取り込んだ。`vscode-languageserver-textdocument` 1.0.14 → 1.0.15、
+  `@types/node` 26.5.1 → 26.6.2（いずれもパッチ）
+- 同梱の例 `examples/kidoairaku.src` で、ミリ秒を待つ単語の名前が Mind 8 と Mind 9 で
+  違うのを条件コンパイルで吸収するようにした（`.vsix` には入らない）
 
 ## [0.1.1] - 2026-09-18
 
@@ -167,7 +187,8 @@ Mind のソースを VS Code で書くための最初の版です。Mind の配�
   （Linux 版は EUC-JP、Windows 版は Shift_JIS）
 - `Mind: Language Server を再起動する`
 
-[未リリース]: https://github.com/shin3tky/MindLS/compare/v0.1.1...HEAD
+[未リリース]: https://github.com/shin3tky/MindLS/compare/v0.1.2...HEAD
+[0.1.2]: https://github.com/shin3tky/MindLS/compare/v0.1.1...v0.1.2
 [0.1.1]: https://github.com/shin3tky/MindLS/compare/v0.1.0...v0.1.1
 [0.1.0]: https://github.com/shin3tky/MindLS/compare/v0.0.3...v0.1.0
 [0.0.3]: https://github.com/shin3tky/MindLS/compare/v0.0.2...v0.0.3

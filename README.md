@@ -219,12 +219,12 @@ npm run package                     # dist/vscode-mind-<version>.vsix
 
 # 2. 1 コミットにまとめてタグを打つ
 git add -A
-git commit -m "vscode-mind 0.1.1 をリリース."
-git tag v0.1.1
+git commit -m "vscode-mind 0.1.2 をリリース."
+git tag v0.1.2
 git push origin main --tags
 
 # 3. 確かめたその .vsix を送る
-npx vsce publish --packagePath dist/vscode-mind-0.1.1.vsix
+npx vsce publish --packagePath dist/vscode-mind-0.1.2.vsix
 ```
 
 出す前に見るところ。
@@ -234,6 +234,8 @@ npx vsce publish --packagePath dist/vscode-mind-0.1.1.vsix
 | `packages/vscode-mind/package.json` の `version` | 上げてあるか |
 | `CHANGELOG.md`（ルートと `packages/vscode-mind/`） | **2 つある。両方**に同じ内容が要る（.vsix に入るのは後者） |
 | `README.md`（ルートと `packages/vscode-mind/`） | 設定の既定値が実装と合っているか |
+| `CHANGELOG.md` 末尾のリンク節 | `[未リリース]` の比較先を新しいタグにし、その版の行を足したか |
+| `engines.vscode` と `@types/vscode` | 同じ下限か（食い違うと `vsce package` が止まる） |
 | `npm run package` の出力 | `dist/`（`distributions.json` と `stdlib/<配布物>.json` を含む）`syntaxes/` `icon.png` `readme.md` `changelog.md` `LICENSE.txt` の 14 ファイル |
 
 > **バージョンは `vsce publish patch` でも上げられます**が、これは `npm version` を呼ぶので
@@ -345,7 +347,7 @@ python3 tools/gen-icon.py
 
 ```sh
 # 配布物を vendor/ に置いてから（再配布しないので Git 管理外）
-#   vendor/mind-for-windows-9.04.zip
+#   vendor/mind-for-windows-9.05.zip
 #   vendor/mind-for-linux-8.0.08.tgz
 npm run gen:stdlib                                     # 見つかった配布物すべて
 node tools/gen-stdlib-dict.ts --dist windows-9         # 1 つだけ
@@ -358,10 +360,46 @@ node tools/extract-samples.ts                          # 公式サンプルを f
 
 ### 新しい版の配布物が出たら
 
+**まず辞書を作り直して、`git diff` に判断させます。** 配布物の改訂が
+我々に関係あるかどうかは、辞書が変わるかどうかで決まります。
+
+```sh
+# vendor/ に新しい配布物を置いてから
+npm run gen:stdlib
+git diff packages/mind-core/data/stdlib/
+```
+
+| diff の結果 | 意味 | やること |
+|---|---|---|
+| 差分なし | 同じ配布物だった | なし |
+| `version` / `origin` だけ動く | **語彙に変化なし** | 由来の記録としてコミットする。拡張のリリースは要らない |
+| `counts` / `words` も動く | **語彙が変わった** | CHANGELOG に書いて拡張をリリースする |
+| 生成が落ちる・0 件になる | 中の置き場所が変わった | 下の 2 を見る |
+
+辞書に生成日時は入れていません。再生成のたびに必ず変わるので、
+「語彙が変わったのか、作り直しただけなのか」が diff から読めなくなるためです。
+由来は `source.version` と `source.origin` が、いつ入ったかは git が持っています。
+
+> **アーカイブの版と、コンパイラが名乗る版は別物です。**
+> たとえば `mind-for-windows-9.05.zip` のコンパイラは `9.03` と表示します
+> （9.04・9.05 はライブラリや同梱ツールだけの改訂だったため）。
+> 辞書の `version` に入れているのは**アーカイブの版**です。
+
+実例として、9.04 → 9.05 では zip の 2400 ファイル中 9 ファイルだけが変わり、
+その中身は評価版 GUI ライブラリの実行時間制限（2分→7分）と、それに伴う
+`lib/guilib.mco/.sym`・`bin/mindwb.mco` の差し替えでした。`file/*.src` も
+`kernel/c_words*.wrd` も 1 バイト変わっておらず、辞書は 1505 語のまま一致しました。
+
+`vendor/` には**最新版だけ置く**ようにしてください。同じ系列が複数あっても版の新しいものを
+選ぶので動きはしますが、どれを使ったのか分かりにくくなります。
+
+---
+
 Mind は言語としては後方互換ですが、ライブラリの単語やソースの置き場所は版ごとに動きます
 （トップディレクトリは `pmind/` → `Mind9/`、`asmword.src` が取り込むカーネル単語表は
 `../kernelF/` → `../kernelK/`、文字コードは EUC-JP → Shift_JIS）。
-その差はコードではなく `distributions.json` に寄せてあります。
+
+その差はコードではなく `distributions.json` に寄せてあります。直しかたは 3 通りです。
 
 1. **同じ系列の改訂版**（9.04 → 9.05 など）: `vendor/` に置いて `npm run gen:stdlib` するだけです。
    アーカイブ名はパターン（`mind-for-windows-9.*.zip`）で探し、版のいちばん新しいものを使います

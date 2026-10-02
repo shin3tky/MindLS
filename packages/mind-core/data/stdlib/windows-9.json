@@ -1,12 +1,11 @@
 {
   "generatedBy": "tools/gen-stdlib-dict.ts",
-  "generatedAt": "2026-09-18",
   "source": {
     "distribution": "windows-9",
     "label": "Mind 9 for Windows",
-    "version": "9.04",
+    "version": "9.05",
     "library": "file",
-    "origin": "mind-for-windows-9.04.zip",
+    "origin": "mind-for-windows-9.05.zip",
     "files": 52
   },
   "counts": {
