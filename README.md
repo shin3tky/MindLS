@@ -219,12 +219,12 @@ npm run package                     # dist/vscode-mind-<version>.vsix
 
 # 2. 1 コミットにまとめてタグを打つ
 git add -A
-git commit -m "vscode-mind 0.1.2 をリリース."
-git tag v0.1.2
+git commit -m "vscode-mind 0.1.3 をリリース."
+git tag v0.1.3
 git push origin main --tags
 
 # 3. 確かめたその .vsix を送る
-npx vsce publish --packagePath dist/vscode-mind-0.1.2.vsix
+npx vsce publish --packagePath dist/vscode-mind-0.1.3.vsix
 ```
 
 出す前に見るところ。

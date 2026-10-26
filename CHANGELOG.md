@@ -5,6 +5,27 @@
 
 ## [未リリース]
 
+## [0.1.3] - 2026-10-26
+
+依存関係と検査基盤を更新した保守リリースです。機能と設定項目に変更はありません。
+
+### セキュリティ
+
+- VS Code 拡張のパッケージ作成ツールから入る推移的な開発依存
+  `@azure/msal-node` を **7.1.1** に固定した。`overrides` で固定しているため、
+  上流の依存指定にかかわらず、この版を使う
+- OSV-Scanner の GitHub Action を 2.6.0 から **2.7.0** に更新した。
+  Action は引き続きコミット SHA で固定する
+
+### 変更
+
+- Language Server 基盤を更新した。
+  `vscode-languageserver` 10.1.1 → **11.0.0**、
+  `vscode-languageserver-textdocument` 1.0.15 → **1.0.16**、
+  `vscode-languageclient` 10.1.1 → **10.1.2**
+- 開発依存を更新した。`@types/node` 26.6.2 → **26.6.5**、
+  Vitest 5.0.1 → **5.0.5**
+
 ## [0.1.2] - 2026-10-02
 
 依存の入りかたを締め、標準単語辞書を Mind 9 for Windows 9.05 から作り直しました。
@@ -187,7 +208,8 @@ Mind のソースを VS Code で書くための最初の版です。Mind の配�
   （Linux 版は EUC-JP、Windows 版は Shift_JIS）
 - `Mind: Language Server を再起動する`
 
-[未リリース]: https://github.com/shin3tky/MindLS/compare/v0.1.2...HEAD
+[未リリース]: https://github.com/shin3tky/MindLS/compare/v0.1.3...HEAD
+[0.1.3]: https://github.com/shin3tky/MindLS/compare/v0.1.2...v0.1.3
 [0.1.2]: https://github.com/shin3tky/MindLS/compare/v0.1.1...v0.1.2
 [0.1.1]: https://github.com/shin3tky/MindLS/compare/v0.1.0...v0.1.1
 [0.1.0]: https://github.com/shin3tky/MindLS/compare/v0.0.3...v0.1.0

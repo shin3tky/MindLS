@@ -4,7 +4,7 @@
 　　　言語仕様は Version 9 を基準。検証環境は Linux 版が最新の **Version 8**（後述 2.5）
 成果物: VS Code 向け拡張 + LSP 準拠 Language Server
 実装スタック: **TypeScript 7.0**（`vscode-languageserver-node`）
-最終更新: 2026-10-02（vscode-mind 0.1.2、Mind 9.05 の取り込みと依存の版固定）
+最終更新: 2026-10-26（vscode-mind 0.1.3、Language Server 基盤と検査用依存の更新）
 
 > **更新履歴**
 > - 2026-09-14 初版
@@ -41,6 +41,9 @@
 >   辞書は 1,505 語のまま（変わったのは評価版 GUI ライブラリの実行時間制限のみ）。辞書から生成日時を外し、
 >   改訂を取り込むかどうかの判断基準を README に書いた。あわせて直接の依存を版固定にし、
 >   対応する VS Code の下限を実態の 1.91 に直した。v0.1.2。
+> - 2026-10-26 Language Server 基盤を `vscode-languageserver` 11.0.0 に更新し、
+>   OSV-Scanner 2.7.0、Vitest 5.0.5 などの保守更新を取り込んだ。
+>   推移的な開発依存 `@azure/msal-node` は 7.1.1 に固定した。v0.1.3。
 >
 > 数字は書いた時点のもの。現在値は各節を参照。
 
@@ -924,7 +927,7 @@ docker run --rm --platform linux/amd64 \
 
 ## 10. 次の一手
 
-M0〜M6 は完了し、拡張は Marketplace に出した（`shin3tky.vscode-mind`、現在 v0.1.2）。
+M0〜M6 は完了し、拡張は Marketplace に出した（`shin3tky.vscode-mind`、現在 v0.1.3）。
 ここから先は**実コンパイラとの結合**だけが残っている。
 
 ### 残タスク
