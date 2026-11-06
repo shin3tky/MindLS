@@ -24,7 +24,7 @@
     "gen:stdlib": "node tools/gen-stdlib-dict.ts"
   },
   "overrides": {
-    "@azure/msal-node": "7.1.1",
+    "@azure/msal-node": "7.2.0",
     "minimatch": "11.0.1"
   },
   "devDependencies": {
