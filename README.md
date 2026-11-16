@@ -45,10 +45,10 @@ Dependabot は npm パッケージと GitHub Actions の更新を週次で確認
   新しい型を入れると、下限の VS Code に無い API を使っても型エラーにならないためです。
   `packages/vscode-mind` の devDependencies に置いてあるので、`vsce package` も食い違いを検査します。
   上げるときは `engines.vscode` と `@types/vscode` を同じ PR で上げてください
-  （いまの下限 1.91 は `vscode-languageclient` 10.x の要求に合わせたもの）
+  （いまの下限 1.91 は `vscode-languageclient` 11.x の要求に合わせたもの）
 
-`minimatch` は GHSA-g3hv-75wg-m249 の対策で `11.0.1` に override しています。
-11 では `makeRe()` が削除されたため、`postinstall` で `vscode-languageclient 10.1.2` の
+`minimatch` は GHSA-g3hv-75wg-m249 の対策で `11.0.8` に override しています。
+11 では `makeRe()` が削除されたため、`postinstall` で `vscode-languageclient 11.0.0` の
 呼び出し 2 箇所を解析済みパターンの検証に置き換えます。照合には従来どおり `match()` を使います。
 `npm ci --ignore-scripts` で入れた場合は、ビルド前に `npm run postinstall` を実行してください。
 上流が minimatch 11 に対応したら、override、`postinstall`、`tools/patch-languageclient.mts` を外します。

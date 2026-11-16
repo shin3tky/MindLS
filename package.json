@@ -24,7 +24,7 @@
     "gen:stdlib": "node tools/gen-stdlib-dict.ts"
   },
   "overrides": {
-    "minimatch": "11.0.5"
+    "minimatch": "11.0.8"
   },
   "devDependencies": {
     "@types/node": "26.6.6",
