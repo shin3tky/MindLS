@@ -47,8 +47,8 @@ Dependabot は npm パッケージと GitHub Actions の更新を週次で確認
   上げるときは `engines.vscode` と `@types/vscode` を同じ PR で上げてください
   （いまの下限 1.91 は `vscode-languageclient` 11.x の要求に合わせたもの）
 
-`minimatch` は GHSA-g3hv-75wg-m249 の対策で `11.0.8` に override しています。
-11 では `makeRe()` が削除されたため、`postinstall` で `vscode-languageclient 11.0.0` の
+`minimatch` は GHSA-g3hv-75wg-m249 の対策で `11.0.9` に override しています。
+11 では `makeRe()` が削除されたため、`postinstall` で `vscode-languageclient 11.0.1` の
 呼び出し 2 箇所を解析済みパターンの検証に置き換えます。照合には従来どおり `match()` を使います。
 `npm ci --ignore-scripts` で入れた場合は、ビルド前に `npm run postinstall` を実行してください。
 上流が minimatch 11 に対応したら、override、`postinstall`、`tools/patch-languageclient.mts` を外します。

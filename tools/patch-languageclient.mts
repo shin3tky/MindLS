@@ -1,6 +1,6 @@
 /**
  * GHSA-g3hv-75wg-m249 の修正版 minimatch 11 は makeRe() を持たない。
- * vscode-languageclient 11.0.0 の検証箇所だけ、解析済みパターンの有無を見る形へ直す。
+ * vscode-languageclient 11.0.1 の検証箇所だけ、解析済みパターンの有無を見る形へ直す。
  * 照合本体の match() はそのまま使う。上流が対応したら override とこの処理を外す。
  */
 import assert from 'node:assert/strict';
@@ -13,7 +13,7 @@ const root = join(dirname(require.resolve('vscode-languageclient/node')), '..', 
 const manifest = join(root, 'package.json');
 assert.equal(
   JSON.parse(readFileSync(manifest, 'utf8')).version,
-  '11.0.0',
+  '11.0.1',
   'vscode-languageclient の版が変わりました。minimatch の互換性パッチを再確認してください。',
 );
 
