@@ -5,6 +5,32 @@
 
 ## [未リリース]
 
+## [0.1.4] - 2026-11-26
+
+VS Code 拡張が使う Language Server 基盤と、開発・検査用の依存関係を更新しました。
+
+### セキュリティ
+
+- GHSA-g3hv-75wg-m249 への対策として、`minimatch` を **11.0.9** に固定した
+- 推移的な開発依存 `qs` を 6.16.0 から **6.17.1** に更新した
+- OSV-Scanner の GitHub Action を 2.7.0 から **2.7.1** に更新した。
+  Action は引き続きコミット SHA で固定する
+
+### 修正
+
+- `minimatch` 11 で削除された `makeRe()` に対応した。インストール時に
+  `vscode-languageclient` の呼び出し 2 箇所を置き換え、ファイル監視とファイル操作の
+  glob パターンを検証できるようにした
+
+### 変更
+
+- `vscode-languageclient` を 10.1.2 から **11.0.1**、
+  `vscode-languageserver` を 11.0.0 から **11.0.1** に更新した
+- 開発依存を更新した。`@types/node` 26.6.5 → **26.6.6**、
+  `@vscode/vsce` 4.0.0 → **4.1.1**、Vitest 5.0.5 → **5.1.1**。
+  推移的な開発依存 `@azure/msal-node` は版の固定を解除し、**7.2.0** に更新した
+- Renovate の設定を追加した
+
 ## [0.1.3] - 2026-10-26
 
 依存関係と検査基盤を更新した保守リリースです。機能と設定項目に変更はありません。
@@ -208,7 +234,8 @@ Mind のソースを VS Code で書くための最初の版です。Mind の配�
   （Linux 版は EUC-JP、Windows 版は Shift_JIS）
 - `Mind: Language Server を再起動する`
 
-[未リリース]: https://github.com/shin3tky/MindLS/compare/v0.1.3...HEAD
+[未リリース]: https://github.com/shin3tky/MindLS/compare/v0.1.4...HEAD
+[0.1.4]: https://github.com/shin3tky/MindLS/compare/v0.1.3...v0.1.4
 [0.1.3]: https://github.com/shin3tky/MindLS/compare/v0.1.2...v0.1.3
 [0.1.2]: https://github.com/shin3tky/MindLS/compare/v0.1.1...v0.1.2
 [0.1.1]: https://github.com/shin3tky/MindLS/compare/v0.1.0...v0.1.1

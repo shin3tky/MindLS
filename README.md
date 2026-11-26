@@ -32,12 +32,13 @@ npm run package   # .vsix を作る
 Pull Request では新しく持ち込まれる脆弱性を比較し、`main` への push、毎週月曜日、
 および手動実行では依存関係全体を検査します。結果は GitHub の Code scanning に登録されます。
 Dependabot は npm パッケージと GitHub Actions の更新を週次で確認し、更新PRを作成します。
+Renovate による依存関係の更新も設定しています。
 
 #### 依存の版
 
 直接の依存は `package.json` で**版を固定**しています（`^` を付けない）。`.npmrc` の
 `save-exact=true` により、`npm install <パッケージ>` で足したものも固定で書かれます。
-版を上げるのは Dependabot の PR（`package.json` と `package-lock.json` を一緒に書き換える）を通すときだけです。
+直接の依存の版を上げるときは、`package.json` と `package-lock.json` を同じ PR で更新します。
 
 - `@mindls/*` はワークスペース内の参照なので `*` のまま
 - `engines`（`node` と `vscode`）は依存ではなく対応する下限なので範囲のまま
@@ -226,19 +227,19 @@ npm run package                     # dist/vscode-mind-<version>.vsix
 
 # 2. 1 コミットにまとめてタグを打つ
 git add -A
-git commit -m "vscode-mind 0.1.3 をリリース."
-git tag v0.1.3
+git commit -m "vscode-mind 0.1.4 をリリース."
+git tag v0.1.4
 git push origin main --tags
 
 # 3. 確かめたその .vsix を送る
-npx vsce publish --packagePath dist/vscode-mind-0.1.3.vsix
+npx vsce publish --packagePath dist/vscode-mind-0.1.4.vsix
 ```
 
 出す前に見るところ。
 
 | | |
 |---|---|
-| `packages/vscode-mind/package.json` の `version` | 上げてあるか |
+| `packages/vscode-mind/package.json` と `package-lock.json` | 拡張の `version` が両方で一致しているか |
 | `CHANGELOG.md`（ルートと `packages/vscode-mind/`） | **2 つある。両方**に同じ内容が要る（.vsix に入るのは後者） |
 | `README.md`（ルートと `packages/vscode-mind/`） | 設定の既定値が実装と合っているか |
 | `CHANGELOG.md` 末尾のリンク節 | `[未リリース]` の比較先を新しいタグにし、その版の行を足したか |
