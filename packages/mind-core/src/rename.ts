@@ -259,12 +259,17 @@ export function renameEdits(
     (old.stem === replacement.stem ||
       (oldStemEnding.length === 2 && replacement.stem.endsWith(oldStemEnding.join(''))));
   const declarationName = inheritOkurigana ? newName + old.okurigana : newName;
+  const inheritForms = inheritOkurigana ||
+    (replacement.okurigana === '' && suffixFor(oldForms, 'terminal') === 'する');
   let newForms: readonly Inflection[] = [];
-  if (inheritOkurigana || (replacement.okurigana === '' && suffixFor(oldForms, 'terminal') === 'する')) {
+  if (inheritForms) {
     newForms = oldForms;
   } else if (replacement.okurigana !== '' && oldForms.length > 0) {
     newForms = inflections(replacement);
   }
+  // 活用が同じなら、「しながら」のように活用表にない語尾も引き継げる。
+  const keepOkurigana = inheritForms || (oldForms.length === 1 && newForms.length === 1 &&
+    FORMS.every((form) => oldForms[0]?.[form] === newForms[0]?.[form]));
   const edits: RenameEdit[] = [];
 
   for (const range of ranges) {
@@ -284,10 +289,11 @@ export function renameEdits(
     const suffix = form === undefined || (okurigana === '' && oldForms.length > 1)
       ? undefined
       : suffixFor(newForms, form);
+    const newOkurigana = suffix ?? (keepOkurigana && okurigana !== '' ? okurigana : replacement.okurigana);
     const dropKoto = occurrence.koto && newForms.length === 0;
     edits.push({
       range: dropKoto ? token.range : occurrence.range,
-      newText: suffix === undefined ? newName : replacement.stem + suffix,
+      newText: replacement.stem + newOkurigana,
     });
   }
 

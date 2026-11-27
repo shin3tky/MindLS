@@ -121,6 +121,21 @@ describe('置き換え', () => {
     expect(after).toContain('２５０円を　記帳する。');
   });
 
+  it.each([
+    ['計上', '記帳', '計上しながら', '記帳', '記帳しながら'],
+    ['計上', '記帳する', '計上しながら', '記帳する', '記帳しながら'],
+    ['計上', '記帳', '計上しないこと', '記帳', '記帳しないこと'],
+    ['かごに入れる', '買い物かごに入', 'かごに入れながら', '買い物かごに入れる', '買い物かごに入れながら'],
+    ['かごに入れる', 'カートに追加', 'かごに入れながら', 'カートに追加', 'カートに追加'],
+    ['海に行く', '靴を磨く', '海に行って', '靴を磨く', '靴を磨いて'],
+  ])('%s を %s に変えたときの呼び出しの語尾（%s）', (old, name, oldCall, definition, call) => {
+    const src = `${old}とは\n　０円を　捨てること。\nメインとは\n　${oldCall}。`;
+    const result = rename(src, { line: 0, character: 1 }, name);
+    expect(Array.isArray(result) && apply(src, result)).toBe(
+      `${definition}とは\n　０円を　捨てること。\nメインとは\n　${call}。`,
+    );
+  });
+
   const shopping = (definition: string, continuative: string, terminal: string, koto: string) => [
     `${definition}とは`,
     '　０円を　捨てること。',
