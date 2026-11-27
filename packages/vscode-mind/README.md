@@ -30,7 +30,8 @@ VS Code **1.91 以上**で動きます。
 ## はじめに
 
 使っている Mind に合わせて **`mind.distribution`** を選んでください。
-標準単語の辞書（補完・ホバー・未定義単語の診断）が切り替わります。
+標準単語の辞書（補完・ホバー・未定義単語の診断）と半角カナの照合規則が切り替わります。
+Mind 8 for Linux では `カウント` と `ｶｳﾝﾄ` は別の単語です。Mind 9 for Windows では同じ単語です。
 
 | `mind.distribution` | 配布物 | ソースの文字コード | 辞書の出どころ |
 |---|---|---|---|
@@ -76,7 +77,7 @@ cd Mind-Docker && make build     # mind-docker:8.0.08 ができる
 
 | 設定 | 既定 | 内容 |
 |---|---|---|
-| `mind.distribution` | `windows-9` | 使っている Mind の配布物（`windows-9` / `linux-8`）。標準単語の辞書が切り替わる |
+| `mind.distribution` | `windows-9` | 使っている Mind の配布物（`windows-9` / `linux-8`）。標準単語の辞書と半角カナの照合規則が切り替わる |
 | `mind.library` | `file` | リンクする標準ライブラリ |
 | `mind.diagnostics.undefinedWords` | `true` | 定義されていない単語を指摘する |
 | `mind.diagnostics.forwardReferences` | `true` | 定義より前での参照を指摘する |

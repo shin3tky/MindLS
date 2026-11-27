@@ -33,12 +33,13 @@ const KNOWN_DIVERGENCES: Record<string, string> = {
   'windows-9/gui/samplew-stddialog-file.src': '`つぎき`（`つぎに` の誤記？）',
 };
 
-const errorsOf = (path: string): string[] =>
-  parse(readFileSync(path, 'utf8'))
-    .diagnostics.filter((d) => d.severity === 'error')
-    .map((e) => `L${String(e.range.start.line + 1)} ${e.message}`);
-
 describe.each(DISTRIBUTION_IDS)('配布物 %s', (id) => {
+  const wordNormalization = manifest.distributions[id]!.wordNormalization;
+  const parseFile = (path: string) => parse(readFileSync(path, 'utf8'), wordNormalization);
+  const errorsOf = (path: string): string[] =>
+    parseFile(path)
+      .diagnostics.filter((d) => d.severity === 'error')
+      .map((e) => `L${String(e.range.start.line + 1)} ${e.message}`);
   const base = join(SAMPLES_ROOT, id);
   const dirs = {
     samples: join(base, 'samples'),
@@ -61,7 +62,7 @@ describe.each(DISTRIBUTION_IDS)('配布物 %s', (id) => {
       const path = join(dirs.samples, name);
       expect(errorsOf(path)).toEqual([]);
       // `mtail.src` のように定数を 1 つ置いて別ファイルに続くだけのものもある
-      const r = parse(readFileSync(path, 'utf8'));
+      const r = parseFile(path);
       expect(r.definitions.length + r.declarations.length).toBeGreaterThan(0);
     });
   });
@@ -89,7 +90,7 @@ describe.each(DISTRIBUTION_IDS)('配布物 %s', (id) => {
     it(`コミット済みの stdlib/${id}.json が最新である`, () => {
       const fromSource = new Set<string>();
       for (const name of stdlib) {
-        const r = parse(readFileSync(join(dirs.stdlib, name), 'utf8'));
+        const r = parseFile(join(dirs.stdlib, name));
         for (const d of [...r.definitions, ...r.declarations]) {
           if (d.visibility === 'global') fromSource.add(d.name.normalized);
         }
@@ -107,7 +108,7 @@ describe.each(DISTRIBUTION_IDS)('配布物 %s', (id) => {
     });
 
     it('大域シンボルが正規形で引ける', () => {
-      const r = parse(readFileSync(join(dirs.stdlib, 'coutput.src'), 'utf8'));
+      const r = parseFile(join(dirs.stdlib, 'coutput.src'));
       const t = buildSymbolTable(r);
       expect(t.globals.get('表示')).toMatchObject({ kind: '処理単語' });
       expect(t.globals.get('一文字表示')).toMatchObject({ kind: '処理単語' });
@@ -125,7 +126,7 @@ describe.each(DISTRIBUTION_IDS)('配布物 %s', (id) => {
     ];
 
     it.each(all)('%s', (_name, path) => {
-      const r = parse(readFileSync(path, 'utf8'));
+      const r = parseFile(path);
       const found = analyze(r, buildSymbolTable(r), { stdlib: stdlibIndex }).map(
         (d) => `L${String(d.range.start.line + 1)} [${d.code}] ${d.message}`,
       );

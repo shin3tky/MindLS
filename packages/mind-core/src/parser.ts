@@ -23,6 +23,7 @@ import {
   VISIBILITY_LOCAL,
 } from './keywords.ts';
 import { normalize } from './normalizer.ts';
+import type { WordNormalizationOptions } from './normalizer.ts';
 import { lex } from './lexer.ts';
 import type { LexDiagnostic } from './lexer.ts';
 import type { Position, Range, Token } from './types.ts';
@@ -96,6 +97,8 @@ export interface ParseResult {
   readonly includes: readonly IncludeRef[];
   readonly diagnostics: readonly ParseDiagnostic[];
   readonly tokens: readonly Token[];
+  /** トークンと同じ規則で新しい単語を照合するために使う。 */
+  readonly wordNormalization?: WordNormalizationOptions;
   /** トップレベルの `終り。` の位置。以降はコンパイル対象外 */
   readonly endOfCompilation: Position | null;
 }
@@ -122,8 +125,8 @@ const toRef = (t: Token): WordRef => {
   };
 };
 
-export function parse(source: string): ParseResult {
-  const lexed = lex(source);
+export function parse(source: string, wordNormalization?: WordNormalizationOptions): ParseResult {
+  const lexed = lex(source, wordNormalization);
   const tokens = lexed.tokens;
   const diagnostics: ParseDiagnostic[] = lexed.diagnostics.map((d) => ({
     message: d.message,
@@ -390,6 +393,7 @@ export function parse(source: string): ParseResult {
     includes: findIncludes(tokens),
     diagnostics,
     tokens,
+    wordNormalization,
     endOfCompilation: lexed.endOfCompilation,
   };
 
@@ -488,7 +492,7 @@ const BODY_MARKER = normalize('本体');
  *   　　。
  */
 const CONDITIONAL_DIRECTIVES = new Set(
-  ['条件コンパイル', '定義済条件コンパイル', '未定義条件コンパイル', '条件コンパイル終り'].map(normalize),
+  ['条件コンパイル', '定義済条件コンパイル', '未定義条件コンパイル', '条件コンパイル終り'].map((word) => normalize(word)),
 );
 const BLOCK_INDEX = new Map(SPECS.map((s, i) => [s, i] as const));
 

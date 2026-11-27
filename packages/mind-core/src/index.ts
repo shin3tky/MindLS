@@ -9,7 +9,7 @@ export {
   splitParticle,
   isNegativeForm,
 } from './normalizer.ts';
-export type { WordAnalysis, ParticleSplit } from './normalizer.ts';
+export type { WordAnalysis, WordNormalizationOptions, ParticleSplit } from './normalizer.ts';
 export { lex, isNumberLiteral } from './lexer.ts';
 export type { LexResult, LexDiagnostic, LexDiagnosticCode } from './lexer.ts';
 export type { Position, Range, Token, TokenKind } from './types.ts';

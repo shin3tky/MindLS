@@ -17,7 +17,7 @@ import type { Dirent } from 'node:fs';
 import { dirname, extname, isAbsolute, join, relative, resolve, sep } from 'node:path';
 
 import { parse } from '@mindls/core';
-import type { ParseResult } from '@mindls/core';
+import type { ParseResult, WordNormalizationOptions } from '@mindls/core';
 
 /** 走査するファイル数の上限。大きなワークスペースで固まらないように */
 const MAX_FILES = 4_000;
@@ -67,11 +67,13 @@ function globalsOf(result: ParseResult): Set<string> {
 
 export class WorkspaceIndex {
   private readonly root: string;
+  private readonly wordNormalization: WordNormalizationOptions | undefined;
   private readonly cache = new Map<string, Entry>();
   /** 走査済みのファイル一覧。ワークスペースが変わるまで使い回す */
   private files: string[] | null = null;
 
-  constructor(root: string) {
+  constructor(root: string, wordNormalization?: WordNormalizationOptions) {
+    this.wordNormalization = wordNormalization;
     const absolute = resolve(root);
     try {
       this.root = realpathSync.native(absolute);
@@ -177,7 +179,7 @@ export class WorkspaceIndex {
       return null;
     }
 
-    const parsed = parse(text);
+    const parsed = parse(text, this.wordNormalization);
     const includes: string[] = [];
     const missing: string[] = [];
     const dir = dirname(safePath);

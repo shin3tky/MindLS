@@ -33,6 +33,7 @@
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { basename, join } from 'node:path';
 
+import type { WordNormalizationOptions } from '../packages/mind-core/src/normalizer.ts';
 import { parse } from '../packages/mind-core/src/parser.ts';
 import {
   REPO,
@@ -75,8 +76,13 @@ function canonicalKind(kind: string): string {
   return kind.startsWith('アセンブラ定義') ? '処理単語' : kind;
 }
 
-function parseFile(fileName: string, source: 'file' | 'kernel', text: string): WordEntry[] {
-  const result = parse(text);
+function parseFile(
+  fileName: string,
+  source: 'file' | 'kernel',
+  text: string,
+  wordNormalization: WordNormalizationOptions | undefined,
+): WordEntry[] {
+  const result = parse(text, wordNormalization);
   const entries: WordEntry[] = [];
 
   for (const d of result.declarations) {
@@ -185,7 +191,9 @@ function generate(dist: OpenedDistribution): void {
       );
     }
     fileCount += files.length;
-    for (const f of files) raw.push(...parseFile(f.name, group.source, readSource(f, spec.encoding)));
+    for (const f of files) {
+      raw.push(...parseFile(f.name, group.source, readSource(f, spec.encoding), spec.wordNormalization));
+    }
   }
 
   const words = dedupe(mergeForwardDeclarations(raw));

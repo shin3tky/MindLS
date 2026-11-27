@@ -11,6 +11,7 @@
 
 import { ATTRIBUTE_WORDS, blockRoleOf, DECLARATION_KEYWORDS, DEFINITION_KEYWORDS } from './keywords.ts';
 import { isNegativeForm, normalize, PARTICLES } from './normalizer.ts';
+import type { WordNormalizationOptions } from './normalizer.ts';
 import type { ParseResult } from './parser.ts';
 import { isReserved } from './reserved.ts';
 import type { StdlibIndex } from './stdlib.ts';
@@ -88,7 +89,7 @@ function isReference(t: Token, headers: ReadonlySet<number>): boolean {
   // それに空白不足で壊れたコメントの破片（`金額）し`）も含めて、開き閉じ両方を見る
   if (/[（()）]/.test(t.raw)) return false;
   // 記号だけの語は単語ではない（`→` `≧` など、壊れたコメントの中身が残ったもの）
-  if (!/[ぁ-ゖァ-ヺ一-龯a-zA-Z0-9ａ-ｚＡ-Ｚ０-９]/.test(t.normalized)) return false;
+  if (!/[ぁ-ゖァ-ヺｦ-ﾝ一-龯a-zA-Z0-9ａ-ｚＡ-Ｚ０-９]/.test(t.normalized)) return false;
   return true;
 }
 
@@ -120,7 +121,8 @@ export function analyze(
     if (end !== null && comparePosition(t.range.start, end) >= 0) break;
 
     if (options.commentParens !== false && t.kind === 'word') {
-      const paren = looksLikeIntendedComment(t.raw) ?? parenOnAction(t.raw, table, options.stdlib);
+      const paren = looksLikeIntendedComment(t.raw) ??
+        parenOnAction(t.raw, table, options.stdlib, result.wordNormalization);
       if (paren !== null) {
         out.push({
           message: `\`${paren}\` はコメントになりません。\`（\` の前と \`）\` の後ろに空白を置いてください（Mind は「かっこ表記に誤りが有ります」とエラーにします）`,
@@ -135,7 +137,7 @@ export function analyze(
     // `未定義条件コンパイル　Ｘ。` は Ｘ がまだ無いことを問うているので、前方参照でも未定義でもない
     if (existenceTests.has(t)) continue;
 
-    if (options.negativeForms !== false && isNegativeForm(t.raw)) {
+    if (options.negativeForms !== false && isNegativeForm(t.raw, result.wordNormalization)) {
       out.push({
         message: `\`${t.raw}\` の否定は Mind に伝わりません。送り仮名は照合前に落とされるので、肯定形と同じ単語になります`,
         range: t.range,
@@ -248,13 +250,14 @@ function parenOnAction(
   raw: string,
   table: SymbolTable,
   stdlib: StdlibIndex | undefined,
+  wordNormalization: WordNormalizationOptions | undefined,
 ): string | null {
   const m = /^(?<stem>[^（(]+)[（(](?<body>[^）)]*)[）)]/.exec(raw);
   if (m?.groups === undefined) return null;
   const body = m.groups['body']!;
   if (!/[ぁ-ゖァ-ヺ一-龯]/.test(body)) return null;
 
-  const stem = normalize(m.groups['stem']!);
+  const stem = normalize(m.groups['stem']!, wordNormalization);
   const kind = table.globals.get(stem)?.kind ?? stdlib?.byNormalized.get(stem)?.kind;
   if (kind !== '処理単語') return null;
   return m[0];

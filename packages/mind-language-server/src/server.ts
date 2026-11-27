@@ -40,7 +40,7 @@ import {
   TOKEN_TYPES,
   normalize,
 } from '@mindls/core';
-import type { ParseResult } from '@mindls/core';
+import type { ParseResult, WordNormalizationOptions } from '@mindls/core';
 
 /** プログラムの入口。正規形で持っておく */
 const MAIN = normalize('メイン');
@@ -49,7 +49,7 @@ import { DockerCompiler, NullCompiler } from '@mindls/compiler';
 import type { CompileDiagnostic, MindCompiler } from '@mindls/compiler';
 
 import {
-  analyze,
+  analyze as analyzeDocument,
   analyzedUris,
   cachedAnalysis,
   forget,
@@ -138,15 +138,22 @@ export function startServer(connection: Connection = createConnection(ProposedFe
   let workspaceRoot: string | null = null;
   let compiler: MindCompiler = new NullCompiler();
   let workspace: WorkspaceIndex | null = null;
-  /** `mind.distribution` の値そのもの。解決は stdlib() に任せる */
+  /** `mind.distribution` の値そのもの */
   let distribution: string | null = null;
   const currentStdlib = () => stdlib(distribution);
+  let wordNormalization: WordNormalizationOptions | undefined;
+  const analyze = (doc: TextDocument) => analyzeDocument(doc, wordNormalization);
 
   /** 未知の配布物が指定されたら 1 回だけ知らせる */
   let warnedDistribution: string | null = null;
   const applyDistribution = (raw: unknown): void => {
     distribution = typeof raw === 'string' && raw.trim() !== '' ? raw : null;
     const resolved = resolveDistributionSetting(distribution);
+    const next = resolved?.spec.wordNormalization;
+    if (wordNormalization !== next) {
+      wordNormalization = next;
+      if (workspaceRoot !== null) workspace = new WorkspaceIndex(workspaceRoot, wordNormalization);
+    }
     if (resolved?.fellBack === true && warnedDistribution !== distribution) {
       warnedDistribution = distribution;
       // 返事の要らない通知で送る（showWarningMessage は応答を待つリクエストになる）
@@ -165,7 +172,7 @@ export function startServer(connection: Connection = createConnection(ProposedFe
     applyDistribution(options?.distribution);
     compilerSettings = readCompilerSettings(options?.compiler, options?.library);
     workspaceRoot = rootOf(params);
-    workspace = workspaceRoot === null ? null : new WorkspaceIndex(workspaceRoot);
+    workspace = workspaceRoot === null ? null : new WorkspaceIndex(workspaceRoot, wordNormalization);
     return {
       capabilities: {
         textDocumentSync: {
@@ -191,7 +198,7 @@ export function startServer(connection: Connection = createConnection(ProposedFe
   });
 
   connection.onInitialized(() => {
-    void connection.client.register(DidChangeConfigurationNotification.type, undefined);
+    void connection.client.register(DidChangeConfigurationNotification.type, { section: 'mind' });
   });
 
   /**

@@ -321,7 +321,7 @@ Language Server は VS Code から UTF-8 のテキストを受け取るので、
 
 | 設定 | 既定 | 内容 |
 |---|---|---|
-| `mind.distribution` | `windows-9` | 使っている Mind の配布物（`windows-9` / `linux-8`）。標準単語の辞書と、文字コード設定コマンドの既定が切り替わる |
+| `mind.distribution` | `windows-9` | 使っている Mind の配布物（`windows-9` / `linux-8`）。標準単語の辞書、半角カナの照合規則、文字コード設定コマンドの既定が切り替わる |
 | `mind.library` | `file` | リンクする標準ライブラリ |
 | `mind.diagnostics.undefinedWords` | `true` | 定義されていない単語を指摘する。`コンパイル` でつながるファイルは一緒に見る |
 | `mind.diagnostics.forwardReferences` | `true` | 定義より前での参照を指摘する |

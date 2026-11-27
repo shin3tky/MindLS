@@ -170,7 +170,7 @@ export function renameEdits(
   const newAnalysis = splitOkurigana(newName);
 
   if (options.allowShadowing !== true) {
-    const taken = symbols.globals.get(normalize(newName));
+    const taken = symbols.globals.get(normalize(newName, parsed.wordNormalization));
     if (taken !== undefined && taken.normalized !== target.entry.normalized) {
       return {
         code: 'name-taken',

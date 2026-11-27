@@ -2,13 +2,14 @@ import { describe, expect, it } from 'vitest';
 
 import { analyze } from '../src/diagnostics.ts';
 import type { AnalyzeOptions } from '../src/diagnostics.ts';
+import type { WordNormalizationOptions } from '../src/normalizer.ts';
 import { parse } from '../src/parser.ts';
 import { createStdlibIndex } from '../src/stdlib.ts';
 import type { StdlibDocument } from '../src/stdlib.ts';
 import { buildSymbolTable } from '../src/symbols.ts';
 
-const run = (src: string, options: AnalyzeOptions = {}) => {
-  const r = parse(src);
+const run = (src: string, options: AnalyzeOptions = {}, wordNormalization?: WordNormalizationOptions) => {
+  const r = parse(src, wordNormalization);
   return analyze(r, buildSymbolTable(r), options);
 };
 const codes = (src: string, options: AnalyzeOptions = {}) => run(src, options).map((d) => d.code);
@@ -49,6 +50,23 @@ describe('未定義単語', () => {
       '　売り上げを　表示すること。',
     ].join('\n');
     expect(codes(src, { undefinedWords: true, stdlib })).toEqual([]);
+  });
+
+  it('半角カナの参照には同じ表記の定義が必要', () => {
+    const body = ['メインとは', '　カウントを　表示し', '　ｶｳﾝﾄを　表示すること。'];
+    const options = { undefinedWords: true, stdlib };
+    const wordNormalization = { foldHalfwidthKana: false };
+    const src = ['カウントは　数値　０。', ...body].join('\n');
+    expect(run(src, options, wordNormalization)).toMatchObject([
+      { code: 'undefined-word', range: { start: { line: 3, character: 1 } } },
+    ]);
+    const bothDefined = ['カウントは　数値　０。', 'ｶｳﾝﾄは　数値　０。', ...body].join('\n');
+    expect(run(bothDefined, options, wordNormalization)).toEqual([]);
+  });
+
+  it('英数記号の幅と英字の大小が異なる参照を解決する', () => {
+    const src = ['ｖｉｄｅｏ／８は　数値　０。', 'メインとは', '　VIDEO/8を　表示すること。'].join('\n');
+    expect(run(src, { undefinedWords: true, stdlib }, { foldHalfwidthKana: false })).toEqual([]);
   });
 
   it('配列の `要素数` は予約語なので報告しない', () => {

@@ -257,7 +257,7 @@ describe('診断の配線（実プロセス）', () => {
     await client.dispose();
   }, 20_000);
 
-  describe('mind.distribution で辞書を切り替える', () => {
+  describe('mind.distribution で辞書と単語の照合規則を切り替える', () => {
     // Windows 版の file ライブラリ（fwinAPI.src）にだけある語
     const WIN_ONLY = 'メインとは\n　Ｗｉｎｄｏｗｓディレクトリを　表示すること。';
 
@@ -286,6 +286,51 @@ describe('診断の配線（実プロセス）', () => {
         'undefined-word',
       );
       await client.dispose();
+    }, 20_000);
+
+    it('設定変更を開いている文書と取り込み先の半角カナの照合に反映する', async () => {
+      const root = mkdtempSync(join(tmpdir(), 'mindls-kana-'));
+      const path = join(root, 'main.src');
+      const uri = pathToFileURL(path).href;
+      const source = [
+        '"lib.src"を　コンパイル。',
+        'カウントは　数値　０。',
+        'ｖｉｄｅｏ／８は　数値　０。',
+        'メインとは',
+        '　ｶｳﾝﾄを　捨て',
+        '　ﾃｽﾄを　捨て',
+        '　VIDEO/8を　捨てること。',
+      ].join('\n');
+      writeFileSync(path, source);
+      writeFileSync(join(root, 'lib.src'), 'テストは　数値　０。');
+
+      const client = new LspClient();
+      try {
+        await client.initialize({ distribution: 'windows-9' }, { rootUri: pathToFileURL(root).href });
+        expect(await client.waitForNotification('client/registerCapability')).toMatchObject({
+          registrations: [{ method: 'workspace/didChangeConfiguration', registerOptions: { section: 'mind' } }],
+        });
+        client.openDocument(uri, source);
+        const diagnostics = 'textDocument/publishDiagnostics';
+        const definition = () => client.request<unknown[]>('textDocument/definition', {
+          textDocument: { uri },
+          position: { line: 4, character: 2 },
+        });
+
+        expect(codesOf(await client.waitForNotification(diagnostics))).toEqual([]);
+        expect(await definition()).toHaveLength(1);
+        client.drainNotifications(diagnostics);
+
+        client.notify('workspace/didChangeConfiguration', { settings: { mind: { distribution: 'linux-8' } } });
+        const linux = await client.waitForNotification(diagnostics);
+        expect(linux).toMatchObject({ diagnostics: [
+          { code: 'undefined-word', range: { start: { line: 4, character: 1 } } },
+          { code: 'undefined-word', range: { start: { line: 5, character: 1 } } },
+        ] });
+        expect(await definition()).toEqual([]);
+      } finally {
+        await client.dispose();
+      }
     }, 20_000);
 
     it('知らない配布物は既定に倒して知らせる', async () => {

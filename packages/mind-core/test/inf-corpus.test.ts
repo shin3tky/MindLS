@@ -7,7 +7,7 @@ import { describe, expect, it } from 'vitest';
 import { analyze } from '../src/diagnostics.ts';
 import { parse } from '../src/parser.ts';
 import { buildSymbolTable } from '../src/symbols.ts';
-import { loadStdlib } from './helpers/stdlib.ts';
+import { loadStdlib, manifest } from './helpers/stdlib.ts';
 
 /**
  * 実コンパイラとの答え合わせ。
@@ -27,6 +27,7 @@ const COLLECTED = join(CORPUS, 'collected');
 
 // 実コンパイラ（Mind 8 for Linux の Docker）で集めた結果なので、辞書も同じ配布物のもの
 const stdlib = loadStdlib('linux-8');
+const wordNormalization = manifest.distributions['linux-8']!.wordNormalization;
 
 interface Sample {
   readonly name: string;
@@ -45,7 +46,7 @@ const samples: Sample[] = existsSync(COLLECTED)
 
 const errorsOf = (name: string): string[] => {
   const source = readFileSync(join(CORPUS, `${name}.src`), 'utf8');
-  const parsed = parse(source);
+  const parsed = parse(source, wordNormalization);
   const table = buildSymbolTable(parsed);
   return [...parsed.diagnostics, ...analyze(parsed, table, { stdlib })]
     .filter((d) => d.severity === 'error')
