@@ -26,9 +26,6 @@ export function isSeparator(ch: string): boolean {
   return SEPARATORS.has(ch);
 }
 
-/** 中点（半角・全角）。単語の照合では無視される。 */
-const NAKAGURO = new Set(['・', '･']);
-
 /** 構文判定に使う助詞。長いものから順に照合する。 */
 export const PARTICLES = [
   'とは', 'から', 'まで', 'より',
@@ -73,21 +70,27 @@ const SEMI_VOICED = new Map<string, string>(Object.entries({
 const HANKAKU_VOICED_MARK = 'ﾞ';      // ﾞ
 const HANKAKU_SEMI_VOICED_MARK = 'ﾟ'; // ﾟ
 
+export interface WordNormalizationOptions {
+  /** 半角カナを全角へ変換する。既定 true。Mind 8 for Linux では false。 */
+  readonly foldHalfwidthKana?: boolean;
+}
+
 /**
  * 幅と大小を畳み込む。
- *   ・半角カナ → 全角カナ（濁点・半濁点は合成する）
+ *   ・設定に応じて半角カナ → 全角カナ（濁点・半濁点は合成する）
  *   ・全角英数記号 → 半角
  *   ・英大文字 → 小文字
  */
-export function foldWidthAndCase(input: string): string {
+export function foldWidthAndCase(input: string, options?: WordNormalizationOptions): string {
   const out: string[] = [];
   const chars = [...input];
+  const foldHalfwidthKana = options?.foldHalfwidthKana !== false;
 
   for (let i = 0; i < chars.length; i++) {
     const ch = chars[i]!;
 
     // 半角カナ
-    const zen = HANKAKU_TO_ZENKAKU.get(ch);
+    const zen = foldHalfwidthKana ? HANKAKU_TO_ZENKAKU.get(ch) : undefined;
     if (zen !== undefined) {
       const next = chars[i + 1];
       if (next === HANKAKU_VOICED_MARK) {
@@ -149,12 +152,11 @@ export interface WordAnalysis {
  *   ・漢字などに続くひらがな（送り仮名）は落とす
  *   ・ただし先頭のひらがなは保持する（`ご案内する` は `案内` と別語）
  *   ・語全体がひらがなの場合は、末尾の助詞と思われるものだけ落とす
- *   ・中点は無視する
- *   ・半角カナ・全角カナ、英字の大小、英数記号の全半角は等価に畳む
+ *   ・幅の変換後、全角の中点を無視する
+ *   ・英字の大小と英数記号の全半角は等価に畳む
  */
-export function analyzeWord(raw: string): WordAnalysis {
-  const folded = foldWidthAndCase(raw);
-  const withoutNakaguro = [...folded].filter((c) => !NAKAGURO.has(c)).join('');
+export function analyzeWord(raw: string, options?: WordNormalizationOptions): WordAnalysis {
+  const withoutNakaguro = foldWidthAndCase(raw, options).replaceAll('・', '');
 
   if (isAllHiragana(withoutNakaguro)) {
     const { stem, dropped } = stripTrailingKanaParticle(withoutNakaguro);
@@ -192,8 +194,8 @@ export function analyzeWord(raw: string): WordAnalysis {
 }
 
 /** 単語の正規形だけが欲しいときの薄い入口。 */
-export function normalize(raw: string): string {
-  return analyzeWord(raw).normalized;
+export function normalize(raw: string, options?: WordNormalizationOptions): string {
+  return analyzeWord(raw, options).normalized;
 }
 
 function stripTrailingKanaParticle(s: string): { stem: string; dropped: string } {
@@ -241,10 +243,10 @@ const NEGATIVE_SUFFIXES = ['ない', 'なかった', 'ません', 'ぬ', 'ず'];
  * 否定形の送り仮名かどうか。`反応させない` のような表記は Mind ではエラーになる。
  * 正規化では落ちてしまうため、診断のために別途判定する。
  */
-export function isNegativeForm(raw: string): boolean {
-  const folded = foldWidthAndCase(raw);
+export function isNegativeForm(raw: string, options?: WordNormalizationOptions): boolean {
+  const folded = foldWidthAndCase(raw, options);
   if (isAllHiragana(folded)) return false;       // ひらがなのみの語は対象外
-  const { droppedKana } = analyzeWord(folded);
+  const { droppedKana } = analyzeWord(folded, options);
   // `表示しないこと` のように、定義の末尾では `こと` が続く
   const tail = droppedKana.replace(/(こと|ため|とき)$/, '');
   return NEGATIVE_SUFFIXES.some((suffix) => tail.endsWith(suffix));

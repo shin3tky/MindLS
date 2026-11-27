@@ -12,6 +12,7 @@
  */
 
 import { analyzeWord, isSeparator, splitParticle } from './normalizer.ts';
+import type { WordNormalizationOptions } from './normalizer.ts';
 import type { Position, Range, Token, TokenKind } from './types.ts';
 
 export interface LexResult {
@@ -149,7 +150,7 @@ class Cursor {
   }
 }
 
-export function lex(source: string): LexResult {
+export function lex(source: string, wordNormalization?: WordNormalizationOptions): LexResult {
   const lines = source.split(/\r?\n/);
   const cur = new Cursor(lines);
   const tokens: Token[] = [];
@@ -185,7 +186,7 @@ export function lex(source: string): LexResult {
     tokens.push({
       kind,
       raw,
-      normalized: analyzeWord(stem).normalized,
+      normalized: analyzeWord(stem, wordNormalization).normalized,
       particle,
       index: indexMatch?.[0] ?? null,
       counter: null,

@@ -12,7 +12,7 @@ import {
  * ゴールデンテスト。
  * 出典: Mind プログラミングマニュアル（基礎編）「2 プログラム表記の基本」
  *   https://www.scripts-lab.co.jp/mind/ver9/doc/02-Program-Hyoki.html
- * マニュアルに出てくる等価例をすべてここに写す。ここが崩れると全部崩れる。
+ * マニュアルの等価例と、Mind 8 for Linux で確認した照合規則を扱う。
  */
 
 describe('送り仮名は無視される', () => {
@@ -79,7 +79,7 @@ describe('中点は無視される', () => {
   });
 });
 
-describe('半角カナと全角カナは等価', () => {
+describe('既定（Mind 9 for Windows）では半角カナと全角カナは等価', () => {
   it('濁点・半濁点を合成する', () => {
     expect(foldWidthAndCase('ｶﾞ')).toBe('ガ');   // ｶﾞ
     expect(foldWidthAndCase('ﾊﾟ')).toBe('パ');   // ﾊﾟ
@@ -96,10 +96,22 @@ describe('半角カナと全角カナは等価', () => {
   });
 });
 
+describe('Mind 8 for Linux の半角カナ', () => {
+  const options = { foldHalfwidthKana: false };
+
+  it.each(['ｶｳﾝﾄ', 'ｶﾞﾗｽ', 'ﾊﾟﾝ', 'テｰスト', 'テ･スト'])('%s の表記を保持する', (word) => {
+    expect(normalize(word, options)).toBe(word);
+  });
+
+  it('全角の中点を除去する', () => {
+    expect(normalize('テ・スト', options)).toBe('テスト');
+  });
+});
+
 describe('英数記号は全半角・大小を畳む', () => {
   it('VIDEO/8 の 4 通りが等価', () => {
     const forms = ['VIDEO/8', 'video/8', 'ＶＩＤＥＯ／８', 'ｖｉｄｅｏ／８'];
-    const normalized = forms.map(normalize);
+    const normalized = forms.map((word) => normalize(word));
     expect(new Set(normalized).size).toBe(1);
     expect(normalized[0]).toBe('video/8');
   });

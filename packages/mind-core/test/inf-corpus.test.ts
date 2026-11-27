@@ -7,7 +7,7 @@ import { describe, expect, it } from 'vitest';
 import { analyze } from '../src/diagnostics.ts';
 import { parse } from '../src/parser.ts';
 import { buildSymbolTable } from '../src/symbols.ts';
-import { loadStdlib } from './helpers/stdlib.ts';
+import { loadStdlib, manifest } from './helpers/stdlib.ts';
 
 /**
  * 実コンパイラとの答え合わせ。
@@ -25,8 +25,9 @@ const REPO = join(dirname(fileURLToPath(import.meta.url)), '..', '..', '..');
 const CORPUS = join(REPO, 'fixtures', 'inf-corpus');
 const COLLECTED = join(CORPUS, 'collected');
 
-// 実コンパイラ（Mind 8 for Linux の Docker）で集めた結果なので、辞書も同じ配布物のもの
+// 辞書と単語の正規化規則は、記録を集めた Mind 8 for Linux に合わせる。
 const stdlib = loadStdlib('linux-8');
+const wordNormalization = manifest.distributions['linux-8']!.wordNormalization;
 
 interface Sample {
   readonly name: string;
@@ -45,7 +46,7 @@ const samples: Sample[] = existsSync(COLLECTED)
 
 const errorsOf = (name: string): string[] => {
   const source = readFileSync(join(CORPUS, `${name}.src`), 'utf8');
-  const parsed = parse(source);
+  const parsed = parse(source, wordNormalization);
   const table = buildSymbolTable(parsed);
   return [...parsed.diagnostics, ...analyze(parsed, table, { stdlib })]
     .filter((d) => d.severity === 'error')
@@ -81,6 +82,32 @@ describe.skipIf(rejected.length === 0)('実コンパイラが弾いたもの', (
       'multi-error': 0,
       offset: 0,
       'undefined-word': 0,
+      // 未定義単語は警告として個別に検証する。
+      'hankaku-kana': 0,
+      'hankaku-nakaguro': 0,
     });
+  });
+});
+
+describe('半角カナ（Mind 8 for Linux）', () => {
+  const undefinedWordsOf = (name: string): string[] => {
+    const source = readFileSync(join(CORPUS, `${name}.src`), 'utf8');
+    const parsed = parse(source, wordNormalization);
+    return analyze(parsed, buildSymbolTable(parsed), { stdlib, undefinedWords: true })
+      .filter((d) => d.code === 'undefined-word')
+      .map((d) => `L${String(d.range.start.line + 1)} ${d.message}`);
+  };
+
+  it('全角で定義した変数を半角で引くと、実コンパイラと同じ行で未定義になる', () => {
+    expect(undefinedWordsOf('hankaku-kana')).toEqual(['L5 `ｶｳﾝﾄに` は定義されていません']);
+  });
+
+  it('半角の中点を省いた参照は未定義になる', () => {
+    expect(undefinedWordsOf('hankaku-nakaguro')).toEqual(['L4 `ﾄｰﾀﾙｶｳﾝﾄに` は定義されていません']);
+  });
+
+  it('半角で定義して半角で引けば通る（送り仮名も落ちる）', () => {
+    expect(accepted).toContainEqual({ name: 'hankaku-kana-same', status: 0 });
+    expect(undefinedWordsOf('hankaku-kana-same')).toEqual([]);
   });
 });

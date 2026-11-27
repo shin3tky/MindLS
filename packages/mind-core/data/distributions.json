@@ -39,6 +39,7 @@
       "platform": "linux",
       "major": 8,
       "encoding": "euc-jp",
+      "wordNormalization": { "foldHalfwidthKana": false },
       "archive": ["mind-for-linux-8.*.tgz"],
       "aliases": ["linux", "mind8", "8"],
       "layout": {

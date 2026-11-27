@@ -45,6 +45,7 @@ import type {
   StdlibDocument,
   StdlibIndex,
   SymbolTable,
+  WordNormalizationOptions,
 } from '@mindls/core';
 
 export interface Analysis {
@@ -55,11 +56,11 @@ export interface Analysis {
 
 const cache = new Map<string, Analysis>();
 
-export function analyze(doc: TextDocument): Analysis {
+export function analyze(doc: TextDocument, wordNormalization?: WordNormalizationOptions): Analysis {
   const hit = cache.get(doc.uri);
-  if (hit !== undefined && hit.version === doc.version) return hit;
+  if (hit?.version === doc.version && hit.parsed.wordNormalization === wordNormalization) return hit;
 
-  const parsed = parse(doc.getText());
+  const parsed = parse(doc.getText(), wordNormalization);
   const analysis: Analysis = { version: doc.version, parsed, symbols: buildSymbolTable(parsed) };
   cache.set(doc.uri, analysis);
   return analysis;
