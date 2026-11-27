@@ -383,10 +383,10 @@ describe('リネーム（実プロセス）', () => {
   ].join('\n');
   const RENAME_URI = 'file:///tmp/rename.src';
 
-  const open = async () => {
+  const open = async (source = SOURCE_R) => {
     const c = new LspClient();
     await c.initialize();
-    c.openDocument(RENAME_URI, SOURCE_R);
+    c.openDocument(RENAME_URI, source);
     return c;
   };
 
@@ -412,6 +412,27 @@ describe('リネーム（実プロセス）', () => {
       '記帳する',
     ]);
     await c.dispose();
+  }, 20_000);
+
+  it('「こと」を含む呼び出しから、終止形で入力した名前にリネームできる', async () => {
+    const c = await open('かごに入れるとは\n　０円を　捨てること。\nメインとは\n　かごに入れ、　かごに入れること。');
+    try {
+      const params = { textDocument: { uri: RENAME_URI }, position: { line: 3, character: 12 } };
+      const prepared = await c.request<{ placeholder: string }>('textDocument/prepareRename', params);
+      expect(prepared.placeholder).toBe('かごに入れる');
+
+      const edit = await c.request<{ changes: Record<string, Array<{ newText: string; range: unknown }>> }>(
+        'textDocument/rename',
+        { ...params, newName: '買う' },
+      );
+      expect(edit.changes[RENAME_URI]).toEqual([
+        { newText: '買う', range: { start: { line: 0, character: 0 }, end: { line: 0, character: 6 } } },
+        { newText: '買い', range: { start: { line: 3, character: 1 }, end: { line: 3, character: 6 } } },
+        { newText: '買う', range: { start: { line: 3, character: 8 }, end: { line: 3, character: 14 } } },
+      ]);
+    } finally {
+      await c.dispose();
+    }
   }, 20_000);
 
   it('標準単語のリネームは理由を付けて断る', async () => {

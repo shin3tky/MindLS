@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import { parse } from '../src/parser.ts';
 import { prepareRename, renameEdits, splitOkurigana, validateName } from '../src/rename.ts';
+import type { RenameEdit } from '../src/rename.ts';
 import { buildSymbolTable } from '../src/symbols.ts';
 
 const SRC = [
@@ -34,6 +35,7 @@ describe('送り仮名の切り出し', () => {
     ['売り上げ計上する', '売り上げ計上', 'する'],
     ['繰り返し', '繰り返', 'し'],
     ['メイン', 'メイン', ''],
+    ['カウンター', 'カウンター', ''],
     ['つぎに', 'つぎに', ''], // ひらがなだけの語は分けない
   ])('%s → %s + %s', (raw, stem, okurigana) => {
     expect(splitOkurigana(raw)).toEqual({ stem, okurigana });
@@ -88,7 +90,7 @@ describe('新しい名前の検査', () => {
 
 describe('置き換え', () => {
   /** 編集を当てた結果のソース */
-  const apply = (src: string, edits: { range: { start: { line: number; character: number }; end: { line: number; character: number } }; newText: string }[]): string => {
+  const apply = (src: string, edits: readonly RenameEdit[]): string => {
     const lines = src.split('\n');
     const sorted = [...edits].sort(
       (a, b) => b.range.start.line - a.range.start.line || b.range.start.character - a.range.start.character,
@@ -112,10 +114,89 @@ describe('置き換え', () => {
     expect(after).toContain('売り上げは　変数。');
   });
 
-  it('新しい名前が送り仮名で終わるなら、元の送り仮名は足さない', () => {
+  it('入力された名前を定義に使い、呼び出しには対応する活用形を使う', () => {
     const after = apply(SRC, rename(SRC, at('１２０円を　売り上げ計上し', '売り上げ計上'), '記帳する') as never);
-    expect(after).toContain('１２０円を　記帳する');
-    expect(after).not.toContain('記帳するし');
+    expect(after).toContain('記帳するとは');
+    expect(after).toContain('１２０円を　記帳し\n');
+    expect(after).toContain('２５０円を　記帳する。');
+  });
+
+  it.each([
+    ['計上', '記帳', '計上しながら', '記帳', '記帳しながら'],
+    ['計上', '記帳する', '計上しながら', '記帳する', '記帳しながら'],
+    ['計上', '記帳', '計上しないこと', '記帳', '記帳しないこと'],
+    ['かごに入れる', '買い物かごに入', 'かごに入れながら', '買い物かごに入れる', '買い物かごに入れながら'],
+    ['かごに入れる', 'カートに追加', 'かごに入れながら', 'カートに追加', 'カートに追加'],
+    ['海に行く', '靴を磨く', '海に行って', '靴を磨く', '靴を磨いて'],
+  ])('%s を %s に変えたときの呼び出しの語尾（%s）', (old, name, oldCall, definition, call) => {
+    const src = `${old}とは\n　０円を　捨てること。\nメインとは\n　${oldCall}。`;
+    const result = rename(src, { line: 0, character: 1 }, name);
+    expect(Array.isArray(result) && apply(src, result)).toBe(
+      `${definition}とは\n　０円を　捨てること。\nメインとは\n　${call}。`,
+    );
+  });
+
+  const shopping = (definition: string, continuative: string, terminal: string, koto: string) => [
+    `${definition}とは`,
+    '　０円を　捨てること。',
+    'メインとは',
+    `　１２０円を　${continuative}、`,
+    `　２５０円を　${terminal}。`,
+    '副処理とは',
+    `　３００円を　${koto}。`,
+  ].join('\n');
+
+  it.each([
+    ['カートに追加', 'カートに追加', 'カートに追加', 'カートに追加', 'カートに追加'],
+    ['カートに追加する', 'カートに追加する', 'カートに追加し', 'カートに追加する', 'カートに追加すること'],
+    ['買う', '買う', '買い', '買う', '買うこと'],
+    ['買い物かごに入', '買い物かごに入れる', '買い物かごに入れ', '買い物かごに入れる', '買い物かごに入れること'],
+    ['商品記入', '商品記入', '商品記入', '商品記入', '商品記入'],
+    ['見る', '見る', '見', '見る', '見ること'],
+    ['走る', '走る', '走り', '走る', '走ること'],
+    ['送る', '送る', '送り', '送る', '送ること'],
+    ['雲る', '雲る', '雲る', '雲る', '雲ること'],
+  ])('買い物の処理単語を「%s」に変更する', (name, definition, continuative, terminal, koto) => {
+    const src = shopping('かごに入れる', 'かごに入れ', 'かごに入れる', 'かごに入れること');
+    const result = rename(src, { line: 3, character: 10 }, name);
+    expect(Array.isArray(result) && apply(src, result)).toBe(shopping(definition, continuative, terminal, koto));
+  });
+
+  it.each([
+    ['税込みにする', '税込みにし', '消費税を加える', '消費税を加え'],
+    ['見せる', '見せ', '来る', '来'],
+    ['見る', '見', '買う', '買い'],
+    ['買う', '買い', '帰る', '帰り'],
+  ])('%s をリネームしたとき %s の活用形を引き継ぐ', (old, oldCall, name, newCall) => {
+    const src = `${old}とは\n　０円を　捨てること。\nメインとは\n　${oldCall}、　${old}。`;
+    const result = rename(src, { line: 0, character: 1 }, name);
+    expect(Array.isArray(result) && apply(src, result)).toBe(
+      `${name}とは\n　０円を　捨てること。\nメインとは\n　${newCall}、　${name}。`,
+    );
+  });
+
+  it('て形とた形を変換し、後ろの助詞を保つ', () => {
+    const src = '川を泳ぐとは\n　０円を　捨てること。\nメインとは\n　川を泳いでから　川を泳いだ、　川を泳いで。';
+    const result = rename(src, { line: 0, character: 1 }, '海に行く');
+    expect(Array.isArray(result) && apply(src, result)).toBe(
+      '海に行くとは\n　０円を　捨てること。\nメインとは\n　海に行ってから　海に行った、　海に行って。',
+    );
+  });
+
+  it('仮定義と本定義に同じ新名を書き、本定義を活用の手掛かりにする', () => {
+    const src = 'かごに入とは　仮定義。\nメインとは\n　かごに入れ、　かごに入れる。\nかごに入れるとは　本定義\n　０円を　捨てること。';
+    const result = rename(src, { line: 0, character: 1 }, '買う');
+    expect(Array.isArray(result) && apply(src, result)).toBe(
+      '買うとは　仮定義。\nメインとは\n　買い、　買う。\n買うとは　本定義\n　０円を　捨てること。',
+    );
+  });
+
+  it('変数の表記を活用させず、通常の助詞「と」や添字を保つ', () => {
+    const src = '売り上げは　数値配列。\n別名は　売り上げと　等価。\nメインとは\n　売り上げ（１）を　表示すること。';
+    const result = rename(src, { line: 0, character: 1 }, '売上高');
+    expect(Array.isArray(result) && apply(src, result)).toBe(
+      '売上高は　数値配列。\n別名は　売上高と　等価。\nメインとは\n　売上高（１）を　表示すること。',
+    );
   });
 
   it('局所変数はその定義の中だけを書き換える', () => {

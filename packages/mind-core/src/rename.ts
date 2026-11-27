@@ -1,25 +1,20 @@
 /**
  * リネーム。
  *
- * Mind は照合の前に送り仮名を落とすので、同じ単語がソース上では
- * `売り上げ計上し` `売り上げ計上する` `売り上げ計上とは` と揺れて現れる。
- * 名前だけを差し替えて、**末尾の送り仮名と助詞はその場のものを残す**。
- *
- *   売り上げ計上し    → 記帳し
- *   売り上げ計上する  → 記帳する
- *   売り上げ計上とは  → 記帳とは
+ * Mind は照合の前に送り仮名を落とす。定義には入力された名前を使い、
+ * 呼び出しでは元の表記から分かる活用形を新しい名前で再現する。
  *
  * 置き換えてよいのは、このファイルで定義・宣言されたシンボルだけ。
  * 標準単語・予約語・制御構文はソースに実体が無いので断る。
  */
 
 import { blockRoleOf, DECLARATION_KEYWORDS, DEFINITION_KEYWORDS } from './keywords.ts';
-import { isSeparator, normalize } from './normalizer.ts';
+import { isHiragana, isSeparator, normalize } from './normalizer.ts';
 import type { ParseResult } from './parser.ts';
 import { enclosingDefinition, findReferences, wordAt } from './queries.ts';
 import { isReserved } from './reserved.ts';
 import type { SymbolEntry, SymbolTable } from './symbols.ts';
-import type { Position, Range } from './types.ts';
+import type { Position, Range, Token } from './types.ts';
 
 export interface RenameTarget {
   readonly entry: SymbolEntry;
@@ -40,10 +35,9 @@ export type RenameError =
   | { readonly code: 'invalid-name'; readonly message: string }
   | { readonly code: 'name-taken'; readonly message: string };
 
-/** ひらがなか（送り仮名の判定に使う） */
-function isHiraganaChar(ch: string): boolean {
-  const c = ch.codePointAt(0) ?? 0;
-  return (c >= 0x3041 && c <= 0x309f) || ch === 'ー';
+interface Spelling {
+  readonly stem: string;
+  readonly okurigana: string;
 }
 
 /**
@@ -52,24 +46,96 @@ function isHiraganaChar(ch: string): boolean {
  * 末尾から続くひらがなが送り仮名。ただし語全体がひらがなのときは分けない
  * （`つぎに` のような語を壊さないため。そもそもリネーム対象にはしない）。
  */
-export function splitOkurigana(text: string): { stem: string; okurigana: string } {
+export function splitOkurigana(text: string): Spelling {
   const chars = [...text];
-  if (chars.every(isHiraganaChar)) return { stem: text, okurigana: '' };
+  if (chars.every(isHiragana)) return { stem: text, okurigana: '' };
   let i = chars.length;
-  while (i > 0 && isHiraganaChar(chars[i - 1]!)) i--;
+  while (i > 0 && isHiragana(chars[i - 1]!)) i--;
   return { stem: chars.slice(0, i).join(''), okurigana: chars.slice(i).join('') };
 }
 
-/** 助詞を除いた、単語そのものの範囲とテキスト */
-function nameOf(raw: string, particle: string | null, range: Range): { text: string; range: Range } {
-  const cut = particle === null ? 0 : particle.length;
-  if (cut === 0) return { text: raw, range };
+const FORMS = ['terminal', 'continuative', 'te', 'past'] as const;
+type Form = (typeof FORMS)[number];
+type Inflection = Readonly<Record<Form, string>>;
+
+const GODAN: ReadonlyMap<string, readonly [continuative: string, te: string]> = new Map([
+  ['う', ['い', 'って']], ['く', ['き', 'いて']], ['ぐ', ['ぎ', 'いで']],
+  ['す', ['し', 'して']], ['つ', ['ち', 'って']], ['ぬ', ['に', 'んで']],
+  ['ぶ', ['び', 'んで']], ['む', ['み', 'んで']], ['る', ['り', 'って']],
+]);
+
+// 漢字の直後が「る」の動詞は読みが分からない。よく使う語は表記で判定する。
+const ICHIDAN_RU = /[見着似煮射鋳得経寝出来]る$/;
+const GODAN_RU = /(?:[走入帰切知要減練照散蹴滑喋握参限焦遮茂捻弄有在過送取撮採売作造創戻乗登上下降折割掘彫塗振踊座去繰祈齧囓]る|[混交]じる)$/;
+const I_E_BEFORE_RU = /[いきぎしじちぢにひびぴみりえけげせぜてでねへべぺめれ]る$/;
+
+function inflections({ stem, okurigana }: Spelling): readonly Inflection[] {
+  const terminal = okurigana || 'する';
+  if (terminal.endsWith('する')) {
+    const prefix = terminal.slice(0, -2);
+    return [{ terminal, continuative: prefix + 'し', te: prefix + 'して', past: prefix + 'した' }];
+  }
+
+  const ending = terminal.slice(-1);
+  const godan = GODAN.get(ending);
+  if (godan === undefined) return [];
+  const prefix = terminal.slice(0, -1);
+  const word = stem + terminal;
+  const ichidan = { terminal, continuative: prefix, te: prefix + 'て', past: prefix + 'た' };
+  const possiblyIchidan = ending === 'る' && !GODAN_RU.test(word);
+  if (possiblyIchidan && (ICHIDAN_RU.test(word) || I_E_BEFORE_RU.test(terminal))) return [ichidan];
+
+  const [continuative, regularTe] = godan;
+  const te = /[行逝]く$/.test(word) ? 'って' : /[問請乞]う$/.test(word) ? 'うて' : regularTe;
+  const past = te.slice(0, -1) + (te.endsWith('で') ? 'だ' : 'た');
+  const regular = { terminal, continuative: prefix + continuative, te: prefix + te, past: prefix + past };
+  // 判定できない「〜る」は両方を候補にし、変換先で形が一致する場合にだけ使う。
+  return terminal === 'る' && possiblyIchidan ? [ichidan, regular] : [regular];
+}
+
+function suffixFor(forms: readonly Inflection[], form: Form): string | undefined {
+  const suffix = forms[0]?.[form];
+  return forms.every((candidate) => candidate[form] === suffix) ? suffix : undefined;
+}
+
+function isCallable(entry: SymbolEntry): boolean {
+  return entry.kind === '処理単語' || entry.kind === '関数' ||
+    entry.kind === '等価' || entry.kind === '等価な関数';
+}
+
+const positionKey = (p: Position): string => `${p.line}:${p.character}`;
+
+function definitionSpelling(parsed: ParseResult, entry: SymbolEntry): Spelling {
+  const locations = new Set(entry.locations.map((range) => positionKey(range.start)));
+  const definition = parsed.definitions
+    .flatMap((def) => [def, ...def.localWords])
+    .find((def) => def.kind !== '仮定義' && locations.has(positionKey(def.name.range.start)));
+  return splitOkurigana(definition?.name.raw ?? entry.aliases[0] ?? '');
+}
+
+function occurrenceOf(
+  token: Token,
+  forms: readonly Inflection[],
+): { text: string; range: Range; koto: boolean } {
+  const { raw, range } = token;
+  const okurigana = token.particle === 'と' || token.particle === 'で'
+    ? splitOkurigana(raw).okurigana
+    : '';
+  const terminal = suffixFor(forms, 'terminal');
+  // 字句解析では「こと」の「と」や、て形の「で」が助詞に分かれることがある。
+  const koto = token.particle === 'と' && terminal !== undefined && okurigana === terminal + 'こと';
+  const te = token.particle === 'で' && forms.some((candidate) => candidate.te === okurigana);
+  const particleLength = te ? 0 : (token.particle?.length ?? 0);
+  const name = raw.slice(0, raw.length - particleLength);
+  const indexLength = token.index !== null && name.endsWith(token.index) ? token.index.length : 0;
+  const cut = koto ? 'こと'.length : particleLength + indexLength;
   return {
     text: raw.slice(0, raw.length - cut),
-    range: {
+    range: cut === 0 ? range : {
       start: range.start,
       end: { line: range.end.line, character: range.end.character - cut },
     },
+    koto,
   };
 }
 
@@ -112,7 +178,10 @@ export function prepareRename(
     };
   }
 
-  const name = nameOf(token.raw, token.particle, token.range);
+  const forms = isCallable(entry) && (token.particle === 'と' || token.particle === 'で')
+    ? inflections(definitionSpelling(parsed, entry))
+    : [];
+  const name = occurrenceOf(token, forms);
   return { entry, range: name.range, text: name.text };
 }
 
@@ -134,7 +203,7 @@ export function validateName(newName: string): RenameError | null {
   if (/^[「『"“'’＇]/.test(newName)) {
     return { code: 'invalid-name', message: '引用符では始められません（文字列と区別できません）' };
   }
-  if ([...newName].every(isHiraganaChar)) {
+  if ([...newName].every((ch) => isHiragana(ch) || ch === 'ー')) {
     return {
       code: 'invalid-name',
       message: 'ひらがなだけの名前は、送り仮名と区別できないので避けてください',
@@ -151,8 +220,7 @@ export interface RenameOptions {
 /**
  * 全出現を書き換える編集を作る。
  *
- * それぞれの出現から末尾の送り仮名を取り出し、新しい名前のうしろに戻す。
- * 助詞は範囲の外なので触らない。
+ * 定義と呼び出しの表記を照合し、対応が分かる活用形だけを付け替える。
  */
 export function renameEdits(
   parsed: ParseResult,
@@ -167,8 +235,6 @@ export function renameEdits(
   const invalid = validateName(newName);
   if (invalid !== null) return invalid;
 
-  const newAnalysis = splitOkurigana(newName);
-
   if (options.allowShadowing !== true) {
     const taken = symbols.globals.get(normalize(newName, parsed.wordNormalization));
     if (taken !== undefined && taken.normalized !== target.entry.normalized) {
@@ -180,27 +246,56 @@ export function renameEdits(
   }
 
   const ranges = findReferences(parsed, symbols, position, { includeDeclaration: true });
+  const tokens = new Map(parsed.tokens.filter((token) => token.kind === 'word')
+    .map((token) => [positionKey(token.range.start), token]));
+  const declarations = new Set(target.entry.locations.map((range) => positionKey(range.start)));
+  const old = definitionSpelling(parsed, target.entry);
+  const replacement = splitOkurigana(newName);
+  const oldForms = isCallable(target.entry) ? inflections(old) : [];
+  // 語幹を延ばすリネーム（かごに入 → 買い物かごに入）では元の活用を使う。
+  // 最後の一字だけが同じ名前（かごに入 → 商品記入）には引き継がない。
+  const oldStemEnding = [...old.stem].slice(-2);
+  const inheritOkurigana = replacement.okurigana === '' && old.okurigana !== '' && oldForms.length > 0 &&
+    (old.stem === replacement.stem ||
+      (oldStemEnding.length === 2 && replacement.stem.endsWith(oldStemEnding.join(''))));
+  const declarationName = inheritOkurigana ? newName + old.okurigana : newName;
+  const inheritForms = inheritOkurigana ||
+    (replacement.okurigana === '' && suffixFor(oldForms, 'terminal') === 'する');
+  let newForms: readonly Inflection[] = [];
+  if (inheritForms) {
+    newForms = oldForms;
+  } else if (replacement.okurigana !== '' && oldForms.length > 0) {
+    newForms = inflections(replacement);
+  }
+  // 活用が同じなら、「しながら」のように活用表にない語尾も引き継げる。
+  const keepOkurigana = inheritForms || (oldForms.length === 1 && newForms.length === 1 &&
+    FORMS.every((form) => oldForms[0]?.[form] === newForms[0]?.[form]));
   const edits: RenameEdit[] = [];
 
   for (const range of ranges) {
-    const text = textOf(parsed, range);
-    if (text === null) continue;
-    const { okurigana } = splitOkurigana(text);
-    // 新しい名前がすでに送り仮名で終わっているなら、そのぶんは足さない
-    const suffix = newAnalysis.okurigana.length > 0 ? '' : okurigana;
-    edits.push({ range, newText: newAnalysis.stem + newAnalysis.okurigana + suffix });
+    const key = positionKey(range.start);
+    const token = tokens.get(key);
+    if (token === undefined) continue;
+    const declaration = declarations.has(key);
+    const occurrence = occurrenceOf(token, declaration ? [] : oldForms);
+    if (declaration) {
+      edits.push({ range: occurrence.range, newText: declarationName });
+      continue;
+    }
+
+    const { okurigana } = splitOkurigana(occurrence.text);
+    const form = FORMS.find((candidate) => oldForms.some((inflection) => inflection[candidate] === okurigana));
+    // 「る」の活用が曖昧な場合は、送り仮名のない出現をその連用形とはみなさない。
+    const suffix = form === undefined || (okurigana === '' && oldForms.length > 1)
+      ? undefined
+      : suffixFor(newForms, form);
+    const newOkurigana = suffix ?? (keepOkurigana && okurigana !== '' ? okurigana : replacement.okurigana);
+    const dropKoto = occurrence.koto && newForms.length === 0;
+    edits.push({
+      range: dropKoto ? token.range : occurrence.range,
+      newText: replacement.stem + newOkurigana,
+    });
   }
 
   return edits;
-}
-
-/** 範囲に対応する生テキストをトークンから拾う */
-function textOf(parsed: ParseResult, range: Range): string | null {
-  for (const t of parsed.tokens) {
-    if (t.range.start.line !== range.start.line) continue;
-    if (t.range.start.character !== range.start.character) continue;
-    const cut = t.range.end.character - range.end.character;
-    return cut > 0 ? t.raw.slice(0, t.raw.length - cut) : t.raw;
-  }
-  return null;
 }
