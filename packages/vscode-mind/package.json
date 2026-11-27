@@ -191,7 +191,7 @@
   },
   "dependencies": {
     "@mindls/language-server": "*",
-    "vscode-languageclient": "11.0.1"
+    "vscode-languageclient": "12.0.0"
   },
   "devDependencies": {
     "@types/vscode": "1.91.0"
