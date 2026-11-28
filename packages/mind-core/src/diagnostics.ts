@@ -10,7 +10,7 @@
  */
 
 import { ATTRIBUTE_WORDS, blockRoleOf, DECLARATION_KEYWORDS, DEFINITION_KEYWORDS } from './keywords.ts';
-import { isNegativeForm, normalize, PARTICLES } from './normalizer.ts';
+import { isHiragana, negativeFormOf, normalize, PARTICLES } from './normalizer.ts';
 import type { WordNormalizationOptions } from './normalizer.ts';
 import type { ParseResult } from './parser.ts';
 import { isReserved } from './reserved.ts';
@@ -137,7 +137,19 @@ export function analyze(
     // `未定義条件コンパイル　Ｘ。` は Ｘ がまだ無いことを問うているので、前方参照でも未定義でもない
     if (existenceTests.has(t)) continue;
 
-    if (options.negativeForms !== false && isNegativeForm(t.raw, result.wordNormalization)) {
+    const negative = options.negativeForms === false ? null : negativeFormOf(t.raw, result.wordNormalization);
+    if (negative === 'rejected') {
+      // 実コンパイラと同じく、送り仮名が「ない」「ず」で終わる否定はエラーにする
+      const allHiragana = [...t.raw].every(isHiragana);
+      out.push({
+        message: allHiragana
+          ? `\`${t.raw}\` は、先頭の 1 字が名前で残りが否定の送り仮名だと読まれます。Mind は「否定の送り仮名が付いています」とエラーにします`
+          : `\`${t.raw}\` に否定の送り仮名が付いています。Mind は送り仮名が「ない」「ず」で終わる否定をエラーにします`,
+        range: t.range,
+        severity: 'error',
+        code: 'negative-form',
+      });
+    } else if (negative === 'ignored') {
       out.push({
         message: `\`${t.raw}\` の否定は Mind に伝わりません。送り仮名は照合前に落とされるので、肯定形と同じ単語になります`,
         range: t.range,

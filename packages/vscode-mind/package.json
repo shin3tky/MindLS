@@ -108,7 +108,7 @@
         "mind.diagnostics.negativeForms": {
           "type": "boolean",
           "default": true,
-          "description": "`表示しない` のような否定形を指摘する。送り仮名は照合前に落ちるので、肯定形と同じ単語になってしまう。"
+          "description": "否定形の送り仮名を指摘する。`表示しない` `残さず` のように送り仮名が「ない」「ず」で終わる否定は、実コンパイラと同じくエラーにする。`表示しないこと` のように末尾以外にある否定は、送り仮名と一緒に落ちて肯定形と同じ単語になるので警告する。"
         },
         "mind.diagnostics.commentParens": {
           "type": "boolean",

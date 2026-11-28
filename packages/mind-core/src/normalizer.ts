@@ -237,17 +237,72 @@ export function splitParticle(raw: string): ParticleSplit {
 
 // --- 否定形の検出 ------------------------------------------------------------
 
-const NEGATIVE_SUFFIXES = ['ない', 'なかった', 'ません', 'ぬ', 'ず'];
+/**
+ * 「ない」「ず」の直前にあると、実コンパイラが否定の送り仮名とみなす仮名。
+ *
+ * Mind 8 for Linux（8.07）と Mind 9 for Windows（9.05）で、直前の仮名 72 通りを総当たりした結果
+ * （`fixtures/inf-corpus/negprobe.src`）。両方の版で完全に同じだった。動詞の未然形の語尾にあたる
+ * あ段・い段・え段の仮名が並ぶが、`ぎ` `へ` `ぺ` などは含まれない。「ず」の前では `で` も含まれない。
+ */
+const REJECTED_BEFORE_NAI = new Set([...'いえかきけがげさしせじぜたちてでなにねばびべまみめらりれわ']);
+const REJECTED_BEFORE_ZU = new Set([...'いえかきけがげさしせじぜたちてなにねばびべまみめらりれわ']);
 
 /**
- * 否定形の送り仮名かどうか。`反応させない` のような表記は Mind ではエラーになる。
- * 正規化では落ちてしまうため、診断のために別途判定する。
+ * 末尾以外に否定があるかを見るときに、否定の語尾の直前とみなす仮名。
+ * 実コンパイラの表に `ぎ` `へ` を足したもの（`過ぎない` `経ない` も否定なのに、エラーにならない）。
  */
+const NEGATIVE_STEM = new Set([...REJECTED_BEFORE_NAI, 'ぎ', 'へ']);
+const NEGATIVE_ENDINGS = ['ない', 'なかっ', 'なく', 'なけれ', 'ず', 'ぬ', 'ねば'];
+
+/**
+ * 否定の送り仮名の扱い。
+ *   ・`rejected` … 実コンパイラが「否定の送り仮名が付いています」とエラーにする
+ *   ・`ignored`  … コンパイルは通るが、否定の意味が送り仮名と一緒に落ちる
+ */
+export type NegativeForm = 'rejected' | 'ignored';
+
+/**
+ * 実コンパイラと同じ切り方で、語の送り仮名を取り出す。
+ * ひらがなだけの語は、先頭の 1 字を名前、残りを送り仮名とみなす（`おかず` は `お` ＋ `かず`）。
+ */
+function compilerOkurigana(chars: readonly string[]): string {
+  if (chars.every(isHiragana)) return chars.slice(1).join('');
+  let i = chars.length;
+  while (i > 0 && isHiragana(chars[i - 1]!)) i--;
+  return chars.slice(i).join('');
+}
+
+/**
+ * 否定の送り仮名かどうか。
+ *
+ * 実コンパイラがエラーにするのは、送り仮名が「ない」か「ず」で**終わり**、その直前の仮名が
+ * 未然形の語尾にあたるときだけ（`表示しない` `残さず` `数えない`）。後ろに何か続くと
+ * （`表示しないこと` `表示せずに` `表示しなかった`）コンパイルは通り、送り仮名と一緒に否定も落ちて、
+ * 肯定形と同じ単語になる。`少ない` `少なくない` のように直前が未然形でなければ否定ではない。
+ *
+ * `raw` は助詞を含む生の表記を渡す（実コンパイラも助詞を切り出す前の語尾を見ている）。
+ */
+export function negativeFormOf(raw: string, options?: WordNormalizationOptions): NegativeForm | null {
+  const chars = [...foldWidthAndCase(raw, options)];
+  const okurigana = [...compilerOkurigana(chars)];
+  const before = (suffixLength: number): string | undefined => okurigana[okurigana.length - suffixLength - 1];
+  const text = okurigana.join('');
+
+  if (text.endsWith('ない') && REJECTED_BEFORE_NAI.has(before(2) ?? '')) return 'rejected';
+  if (text.endsWith('ず') && REJECTED_BEFORE_ZU.has(before(1) ?? '')) return 'rejected';
+
+  // ひらがなだけの語は、名前と送り仮名の境目が分からないので、エラーになる形だけを見る
+  if (chars.every(isHiragana)) return null;
+  if (text.includes('ません')) return 'ignored';
+  for (let i = 1; i < okurigana.length; i++) {
+    if (!NEGATIVE_STEM.has(okurigana[i - 1]!)) continue;
+    const rest = okurigana.slice(i).join('');
+    if (NEGATIVE_ENDINGS.some((ending) => rest.startsWith(ending))) return 'ignored';
+  }
+  return null;
+}
+
+/** 否定の送り仮名が付いているか（エラーになるものも、意味が落ちるだけのものも含む） */
 export function isNegativeForm(raw: string, options?: WordNormalizationOptions): boolean {
-  const folded = foldWidthAndCase(raw, options);
-  if (isAllHiragana(folded)) return false;       // ひらがなのみの語は対象外
-  const { droppedKana } = analyzeWord(folded, options);
-  // `表示しないこと` のように、定義の末尾では `こと` が続く
-  const tail = droppedKana.replace(/(こと|ため|とき)$/, '');
-  return NEGATIVE_SUFFIXES.some((suffix) => tail.endsWith(suffix));
+  return negativeFormOf(raw, options) !== null;
 }

@@ -64,7 +64,7 @@ Docker を起動し、Mind-Docker の `vendor/` に Mind 8 for Linux の配布�
 | `mind.library` | `file` | 使用する標準ライブラリを指定します。GUI 編では `guilib` を指定します。 |
 | `mind.diagnostics.undefinedWords` | `true` | 定義されていない単語を指摘します。 |
 | `mind.diagnostics.forwardReferences` | `true` | 定義より前の参照を指摘します。 |
-| `mind.diagnostics.negativeForms` | `true` | `表示しない` などの否定形を指摘します。 |
+| `mind.diagnostics.negativeForms` | `true` | 否定形の送り仮名を指摘します。`表示しない` のように「ない」「ず」で終わる否定はエラー、`表示しないこと` のように否定の意味だけが落ちる書き方は警告です。 |
 | `mind.diagnostics.commentParens` | `true` | 空白の不足でコメントとして扱われない `（ ）` を指摘します。 |
 | `mind.compiler.enabled` | `false` | 保存時に Docker 上の実コンパイラで検査するかを指定します。 |
 | `mind.compiler.docker.image` | `mind-docker:8.0.08` | 実コンパイラでの検査に使う Docker イメージを指定します。 |

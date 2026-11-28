@@ -8,6 +8,7 @@ export {
   normalize,
   splitParticle,
   isNegativeForm,
+  negativeFormOf,
 } from './normalizer.ts';
 export type { WordAnalysis, WordNormalizationOptions, ParticleSplit } from './normalizer.ts';
 export { lex, isNumberLiteral } from './lexer.ts';
