@@ -5,7 +5,7 @@
 
 日本語プログラミング言語 [Mind](https://www.scripts-lab.co.jp/mind/whatsmind.html)（Scripts Lab Inc.）の Language Server と VS Code 拡張です。構文ハイライト、補完、定義への移動、参照の検索、リネーム、診断を提供します。
 
-[0.1.5 の変更履歴](CHANGELOG.md#015---2026-11-28)には、処理単語のリネーム時の活用と、Mind 8 for Linux の半角カナ・半角中点の照合に関する修正を記載しています。
+[0.1.6 では否定形の送り仮名の診断を修正しました](CHANGELOG.md#016---2026-11-28)。`表示しない` や `残さず` は実コンパイラと同じくエラーになり、`表示しないこと` や `表示せずに` は否定の意味が失われるため警告になります。
 
 ## VS Code で使う
 
@@ -180,12 +180,12 @@ npm test
 npm run package
 ```
 
-`npm run package` は、ビルド済みの拡張機能と Language Server を esbuild でバンドルしてから VSIX を作ります。0.1.5 の出力先は `dist/vscode-mind-0.1.5.vsix` です。配布物の定義と辞書は `dist/distributions.json` と `dist/stdlib/` に同梱します。バンドルだけを作る場合は `npm run bundle` を実行します。
+`npm run package` は、ビルド済みの拡張機能と Language Server を esbuild でバンドルしてから VSIX を作ります。0.1.6 の出力先は `dist/vscode-mind-0.1.6.vsix` です。配布物の定義と辞書は `dist/distributions.json` と `dist/stdlib/` に同梱します。バンドルだけを作る場合は `npm run bundle` を実行します。
 
 VSIX を VS Code にインストールし、サンプルで動作を確認します。
 
 ```sh
-code --install-extension dist/vscode-mind-0.1.5.vsix
+code --install-extension dist/vscode-mind-0.1.6.vsix
 ```
 
 ### リリース前の確認
@@ -193,7 +193,7 @@ code --install-extension dist/vscode-mind-0.1.5.vsix
 1. `packages/vscode-mind/package.json` と `package-lock.json` の拡張機能のバージョンをそろえます。
 2. ルートと `packages/vscode-mind/` の CHANGELOG を同じ内容にそろえ、末尾の比較リンクを更新します。両方の README を実装と設定の既定値に合わせます。
 3. VSIX のマニフェストと、同梱される `readme.md`、`changelog.md`、辞書、バンドルを確認します。
-4. リリースブランチの変更を `main` に取り込んだ後、リリースコミットにタグ（0.1.5 の場合は `v0.1.5`）を付けて push します。
+4. リリースブランチの変更を `main` に取り込んだ後、リリースコミットにタグ（0.1.6 の場合は `v0.1.6`）を付けて push します。
 
 ### Marketplace に公開する
 
@@ -202,7 +202,7 @@ code --install-extension dist/vscode-mind-0.1.5.vsix
 動作確認済みの VSIX は、パブリッシャー管理画面からアップロードできます。CLI を使う場合は、公開用の認証を設定したうえで `--packagePath` に確認済みのファイルを指定します。
 
 ```sh
-npx vsce publish --packagePath dist/vscode-mind-0.1.5.vsix
+npx vsce publish --packagePath dist/vscode-mind-0.1.6.vsix
 ```
 
 現在のソースからパッケージを生成して公開する場合は `npm run release` を使います。
