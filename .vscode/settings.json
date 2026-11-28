@@ -1,0 +1,8 @@
+{
+    "[mind]": {
+        "files.encoding": "utf8"
+    },
+    "files.associations": {
+        "*.src": "mind"
+    }
+}

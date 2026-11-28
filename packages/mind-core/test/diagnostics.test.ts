@@ -168,6 +168,29 @@ describe('否定形の送り仮名', () => {
     expect(d?.message).toContain('否定');
   });
 
+  it('末尾以外の否定は、コンパイルが通るので警告にとどめる', () => {
+    const [d] = run('メインとは\n　表示しないこと。');
+    expect(d?.severity).toBe('warning');
+  });
+
+  it('送り仮名が「ない」「ず」で終わる否定は、実コンパイラと同じくエラーにする', () => {
+    for (const src of ['メインとは\n　「a」を　表示しない。', 'メインとは\n　「a」を　表示せず。']) {
+      const d = run(src).find((x) => x.code === 'negative-form');
+      expect(d?.severity).toBe('error');
+      expect(d?.message).toContain('否定の送り仮名が付いています');
+    }
+  });
+
+  it('`少ない` のように直前が未然形でない「ない」は否定ではない', () => {
+    expect(codes('少ないとは\n　表示すること。\nメインとは\n　少ない。')).not.toContain('negative-form');
+  });
+
+  it('ひらがなだけの名前 `おかず` は、先頭の 1 字が名前と読まれてエラーになる', () => {
+    const d = run('おかずとは\n　表示すること。\nメインとは\n　おかず。').find((x) => x.code === 'negative-form');
+    expect(d?.severity).toBe('error');
+    expect(d?.message).toContain('先頭の 1 字が名前');
+  });
+
   it('肯定形は報告しない', () => {
     expect(codes('メインとは\n　表示すること。')).toEqual([]);
   });

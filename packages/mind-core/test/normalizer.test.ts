@@ -3,6 +3,7 @@ import {
   analyzeWord,
   foldWidthAndCase,
   isNegativeForm,
+  negativeFormOf,
   isSeparator,
   normalize,
   splitParticle,
@@ -135,6 +136,38 @@ describe('否定形の検出', () => {
   it('ひらがなのみの語は対象外', () => {
     // 「ない」自体が単語のことがあるため、送り仮名としての否定だけを見る
     expect(isNegativeForm('ない')).toBe(false);
+  });
+});
+
+describe('否定の送り仮名の扱い（実コンパイラに合わせる）', () => {
+  // fixtures/inf-corpus/negative-*.src。Mind 8 for Linux と Mind 9 for Windows で同じ結果
+  it.each(['表示しない', '表示せず', '残さず', '数えない', '反応させない', 'データを残さず'])(
+    '%s は送り仮名が「ない」「ず」で終わるのでエラーになる',
+    (raw) => {
+      expect(negativeFormOf(raw)).toBe('rejected');
+    },
+  );
+
+  it.each(['表示しないこと', '表示せずに', '表示しないで', '表示しなかった', '表示しません', '表示せぬ', '表示しなければ'])(
+    '%s はコンパイルが通るが、否定の意味が落ちる',
+    (raw) => {
+      expect(negativeFormOf(raw)).toBe('ignored');
+    },
+  );
+
+  it.each(['少ない', '少なくない', '少ないとは', '表示ない', '表示ず', '必ず', '表示する'])('%s は否定ではない', (raw) => {
+    expect(negativeFormOf(raw)).toBeNull();
+  });
+
+  it('実コンパイラの表に無い `ぎ` の否定は、エラーではなく意味が落ちるものとして扱う', () => {
+    expect(negativeFormOf('過ぎない')).toBe('ignored');
+    expect(negativeFormOf('過ぎず')).toBe('ignored');
+  });
+
+  it('ひらがなだけの語は、先頭の 1 字を名前とみなす（`おかず` は `お` ＋ `かず`）', () => {
+    expect(negativeFormOf('おかず')).toBe('rejected');
+    expect(negativeFormOf('つぎに')).toBeNull();
+    expect(negativeFormOf('さもなければ')).toBeNull();
   });
 });
 
