@@ -22,7 +22,7 @@ concurrency:
 jobs:
   test:
     name: Typecheck and test (Node.js ${{ matrix.node-version }})
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     timeout-minutes: 15
     strategy:
       fail-fast: false
