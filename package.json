@@ -11,7 +11,6 @@
     "packages/*"
   ],
   "scripts": {
-    "postinstall": "node tools/patch-languageclient.mts",
     "build": "tsc --build",
     "watch": "tsc --build --watch",
     "bundle": "node tools/bundle.mts",
@@ -24,7 +23,9 @@
     "gen:stdlib": "node tools/gen-stdlib-dict.ts"
   },
   "overrides": {
-    "minimatch": "11.0.9"
+    "@vscode/vsce": {
+      "minimatch": "11.0.9"
+    }
   },
   "devDependencies": {
     "@types/node": "26.6.6",
