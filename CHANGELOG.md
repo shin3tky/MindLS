@@ -5,11 +5,23 @@
 
 ## [未リリース]
 
+## [0.1.5] - 2026-11-28
+
 ### 修正
 
-- リネームで新しい名前を活用させ、`かごに入れ` を `買い` にできます。
-  `カートに追加` のように送り仮名のない名前へ変えると、元の動詞の語尾が
-  誤って付くこともありません。
+- 処理単語のリネームで、呼び出しの活用形を新しい名前に合わせるようにした。
+  `かごに入れる` を `買う` に変えると `かごに入れ` は `買い` になり、
+  `カートに追加` に変えると `かごに入れ` は `カートに追加` になる
+- Mind 8 for Linux（`linux-8`）の単語照合を実コンパイラに合わせた。
+  `カウント` と `ｶｳﾝﾄ` を別の単語として扱い、半角の中点 `･` も照合に使う
+
+### 変更
+
+- `vscode-languageclient` を **12.0.0**、`vscode-languageserver` を **11.0.2** に更新した。
+  両方が使う LSP プロトコルは **3.18.7**、JSON-RPC は **10.0.2** になった
+- クライアントが `minimatch` 11 に対応したため、インストール時の互換性パッチを削除した。
+  `minimatch` **11.0.9** の override は配布ツール `@vscode/vsce` に限定した
+- 開発依存の `@types/node` を 26.6.6 から **26.6.11**、Vitest を 5.1.1 から **5.1.2** に更新した
 
 ## [0.1.4] - 2026-11-26
 
@@ -240,7 +252,8 @@ Mind のソースを VS Code で書くための最初の版です。Mind の配�
   （Linux 版は EUC-JP、Windows 版は Shift_JIS）
 - `Mind: Language Server を再起動する`
 
-[未リリース]: https://github.com/shin3tky/MindLS/compare/v0.1.4...HEAD
+[未リリース]: https://github.com/shin3tky/MindLS/compare/v0.1.5...HEAD
+[0.1.5]: https://github.com/shin3tky/MindLS/compare/v0.1.4...v0.1.5
 [0.1.4]: https://github.com/shin3tky/MindLS/compare/v0.1.3...v0.1.4
 [0.1.3]: https://github.com/shin3tky/MindLS/compare/v0.1.2...v0.1.3
 [0.1.2]: https://github.com/shin3tky/MindLS/compare/v0.1.1...v0.1.2

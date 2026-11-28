@@ -125,6 +125,10 @@ code --extensionDevelopmentPath="$PWD/packages/vscode-mind" examples
 | 診断 | `examples/diagnostics.src` を開く | 警告が 3 つ（下記） |
 | 診断が出ない例 | `examples/kidoairaku.src`（喜怒哀楽ライフゲーム）を開く | 警告 0。`近傍Ｘの　要素数を` の `要素数` にホバーすると予約語の説明が出る |
 
+処理単語をリネームすると、呼び出しの活用形も新しい名前に合わせます。
+`かごに入れる` を `買う` に変えると、呼び出しの `かごに入れ` は `買い` になります。
+`カートに追加` に変えた場合、呼び出しは `カートに追加` になります。
+
 `examples/diagnostics.src` はわざと引っかけてあります。
 
 | 行 | 出る警告 |
@@ -225,12 +229,12 @@ npm run package                     # dist/vscode-mind-<version>.vsix
 
 # 2. 1 コミットにまとめてタグを打つ
 git add -A
-git commit -m "vscode-mind 0.1.4 をリリース."
-git tag v0.1.4
+git commit -m "vscode-mind 0.1.5 をリリース."
+git tag v0.1.5
 git push origin main --tags
 
 # 3. 確かめたその .vsix を送る
-npx vsce publish --packagePath dist/vscode-mind-0.1.4.vsix
+npx vsce publish --packagePath dist/vscode-mind-0.1.5.vsix
 ```
 
 出す前に見るところ。
@@ -328,6 +332,9 @@ Language Server は VS Code から UTF-8 のテキストを受け取るので、
 | `mind.compiler.enabled` | `false` | 保存時に本物の Mind コンパイラで検査する（Docker が要る） |
 | `mind.compiler.docker.image` | `mind-docker:8.0.08` | そのときに使うイメージ |
 | `mind.trace.server` | `off` | LSP のやりとりを出力パネルに記録する |
+
+Mind 8 for Linux（`linux-8`）では `カウント` と `ｶｳﾝﾄ` を別の単語として扱い、半角の中点 `･` も照合に使います。
+Mind 9 for Windows（`windows-9`）では半角カナを全角カナと同じものとして扱います。
 
 ## アイコン
 
