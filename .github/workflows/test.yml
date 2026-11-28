@@ -1,0 +1,64 @@
+name: Test
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+  merge_group:
+    types:
+      - checks_requested
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: test-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    name: Typecheck and test (Node.js ${{ matrix.node-version }})
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        # 26.5.0 は package.json の engines.node の下限。26.x はその系列の最新。
+        node-version:
+          - 26.5.0
+          - 26.x
+    steps:
+      - name: Check out
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up Node.js
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: ${{ matrix.node-version }}
+          # package.json に packageManager が無いので、npm のキャッシュは明示する
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      # tsc --build --force は型検査と同時に dist/ も出力する。
+      # Language Server のテストは dist/cli.js を実プロセスとして起動するので、テストより先に走らせる
+      - name: Typecheck
+        run: npm run typecheck
+
+      # Mind の配布物と Docker は使わない。公式サンプルと実コンパイラを使うテストは、無ければ自動で飛ばす
+      - name: Test
+        run: npm test
+
+      # .vsix に入る束ねた Language Server が起動し、辞書を読めるかを確かめる
+      # （packages/vscode-mind/test/bundle.test.ts は、バンドルがあるときだけ走る）
+      - name: Test bundle
+        run: |
+          npm run bundle
+          npx vitest run packages/vscode-mind/test/bundle.test.ts

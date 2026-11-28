@@ -1,5 +1,6 @@
 # MindLS
 
+[![Test](https://github.com/shin3tky/MindLS/actions/workflows/test.yml/badge.svg?branch=main)](https://github.com/shin3tky/MindLS/actions/workflows/test.yml)
 [![OSV-Scanner](https://github.com/shin3tky/MindLS/actions/workflows/osv-scanner.yml/badge.svg?branch=main)](https://github.com/shin3tky/MindLS/actions/workflows/osv-scanner.yml)
 
 日本語プログラミング言語 [Mind](https://www.scripts-lab.co.jp/mind/whatsmind.html)（Scripts Lab Inc.）の Language Server と VS Code 拡張です。構文ハイライト、補完、定義への移動、参照の検索、リネーム、診断を提供します。
@@ -124,6 +125,8 @@ node packages/mind-language-server/dist/cli.js --stdio
 `@types/vscode` は `engines.vscode` の下限と同じ **1.91.0** に固定しています。対応下限を引き上げる場合は、両方を同じ PR で更新します。
 
 0.1.5 では `vscode-languageclient` 12.0.0 と `vscode-languageserver` 11.0.2 が共通の LSP プロトコル 3.18.7 と JSON-RPC 10.0.2 を使います。クライアントの glob パターン検証は上流で `minimatch` 11 に対応し、インストール時の互換性パッチを削除しました。`minimatch` 10 系を要求する `@vscode/vsce` 4.1.1 には、[GHSA-g3hv-75wg-m249](https://github.com/advisories/GHSA-g3hv-75wg-m249) への対策として `11.0.9` の override を適用しています。
+
+GitHub Actions の [Test](.github/workflows/test.yml) は、PR・マージキュー・`main` への push・手動実行で `npm run typecheck` と `npm test` を実行し、配布用バンドルが起動するかも確かめます。Node.js は `engines.node` の下限（26.5.0）と 26 系列の最新の 2 つです。Mind の配布物と Docker は使わないので、公式サンプルと実コンパイラを使うテストは飛ばします。
 
 GitHub Actions の [OSV-Scanner](.github/workflows/osv-scanner.yml) は、PR とマージキューで依存関係の差分を、`main` への push・毎週月曜日・手動実行で依存関係全体を検査します。結果は GitHub の Code scanning に登録されます。依存の更新には Dependabot と Renovate を使っています。
 
